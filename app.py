@@ -236,6 +236,44 @@ hr { border-color: var(--line); }
 
 .command-room-note { color: var(--muted); font: .68rem 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
 
+.vault-bento { display: grid; grid-template-columns: 1.05fr 1.22fr .72fr; gap: 1rem; margin-bottom: 1rem; }
+.vault-visual, .vault-copy, .vault-feature, .vault-panel, .bounty-overview {
+    border: 1px solid rgba(125,104,210,.28);
+    background: linear-gradient(135deg, rgba(28,24,46,.98), rgba(14,18,25,.97));
+    box-shadow: 0 22px 50px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.vault-visual { min-height: 284px; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 1.4rem; background: radial-gradient(circle at 67% 28%, rgba(158,116,255,.9), transparent 21%), radial-gradient(circle at 64% 65%, rgba(47,205,239,.7), transparent 28%), radial-gradient(circle at 20% 84%, rgba(221,80,231,.75), transparent 25%), linear-gradient(145deg, #26145e, #161342 72%); }
+.vault-visual::before { content: ""; position: absolute; width: 210px; height: 210px; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; left: -62px; top: 44px; box-shadow: 0 0 0 28px rgba(255,255,255,.04), 0 0 0 58px rgba(255,255,255,.025); }
+.vault-visual::after { content: ""; position: absolute; inset: 0; background: linear-gradient(130deg, transparent 44%, rgba(255,255,255,.12) 49%, transparent 53%); opacity: .65; }
+.vault-visual > * { position: relative; z-index: 1; }
+.vault-tag { color: rgba(255,255,255,.9); font: .72rem 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
+.vault-monogram { align-self: center; display: grid; place-items: center; width: 144px; height: 144px; border: 12px solid rgba(255,255,255,.92); border-radius: 42px; color: #fff; font-size: 4rem; font-weight: 700; letter-spacing: -.16em; transform: rotate(-8deg); text-shadow: 0 8px 20px rgba(0,0,0,.24); box-shadow: 0 18px 34px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.5); }
+.vault-visual h2 { margin: 0; font-size: 1.6rem; position: relative; z-index: 1; }
+.vault-copy { min-height: 284px; padding: 2rem 1.7rem; position: relative; overflow: hidden; }
+.vault-copy::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 15% 0, rgba(168,140,255,.32), transparent 34%); }
+.vault-copy > * { position: relative; z-index: 1; }
+.vault-copy h1 { margin: .4rem 0 1.1rem; max-width: 480px; font-size: clamp(2.1rem, 3.5vw, 3.7rem); line-height: .98; }
+.vault-copy p { max-width: 520px; font-size: 1rem; }
+.vault-feature-stack { display: grid; gap: .72rem; }
+.vault-feature { min-height: calc((284px - 1.44rem) / 3); padding: 1rem 1.05rem; display: flex; flex-direction: column; justify-content: center; }
+.vault-feature h3 { margin: 0 0 .3rem; font-size: 1rem; }
+.vault-feature p { margin: 0; font-size: .82rem; }
+.vault-feature:hover, .vault-panel:hover, .bounty-overview:hover, .vault-copy:hover, .vault-visual:hover { transform: translateY(-4px) rotateX(1deg); border-color: rgba(168,140,255,.52); box-shadow: 0 28px 54px rgba(0,0,0,.38), 0 0 30px rgba(168,140,255,.08); }
+.vault-lower { display: grid; grid-template-columns: 1.12fr .88fr; gap: 1rem; margin: 1rem 0; }
+.vault-panel { padding: 1.35rem; min-height: 205px; }
+.vault-panel h2, .bounty-overview h2 { margin: 0 0 .55rem; font-size: 1.35rem; }
+.vault-process { display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem; margin-top: 1rem; }
+.vault-step { border: 1px solid rgba(255,255,255,.08); background: rgba(5,8,13,.22); padding: .7rem; }
+.vault-step strong { color: var(--paper); display: block; font: .68rem 'DM Mono', monospace; letter-spacing: .06em; }
+.vault-step span { color: var(--muted); display: block; font-size: .78rem; margin-top: .3rem; }
+.bounty-overview { padding: 1.35rem; margin-top: 1rem; overflow: hidden; }
+.bounty-table-head, .bounty-table-row { display: grid; grid-template-columns: minmax(180px, 1.6fr) .8fr .65fr .9fr 1fr; gap: .8rem; align-items: center; }
+.bounty-table-head { color: var(--muted); padding: .55rem .8rem; font: .64rem 'DM Mono', monospace; letter-spacing: .06em; text-transform: uppercase; }
+.bounty-table-row { padding: .85rem .8rem; border-top: 1px solid rgba(255,255,255,.06); background: rgba(5,8,13,.14); transition: background .2s ease, transform .2s ease; }
+.bounty-table-row:hover { background: rgba(168,140,255,.1); transform: translateX(4px); }
+.bounty-name { color: var(--paper); font-weight: 600; }
+.bounty-id { color: var(--muted); display: block; margin-top: .2rem; font: .63rem 'DM Mono', monospace; }
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
@@ -246,7 +284,19 @@ hr { border-color: var(--line); }
     .hero-signal { opacity: .28; right: -1.8rem; width: 130px; height: 130px; }
     .command-topbar { align-items: flex-start; flex-direction: column; }
     .command-pills { justify-content: flex-start; }
-    .hero-main:hover, .hero-side:hover, .metric-card:hover, .bounty-card:hover, .event-card:hover, .protocol-card:hover { transform: translateY(-2px); }
+    .vault-bento, .vault-lower { grid-template-columns: 1fr; }
+    .vault-visual, .vault-copy { min-height: 230px; }
+    .vault-copy h1 { font-size: 2.45rem; }
+    .vault-feature-stack { grid-template-columns: repeat(3, 1fr); }
+    .vault-feature { min-height: 150px; }
+    .bounty-table-head, .bounty-table-row { grid-template-columns: minmax(150px, 1fr) .75fr .65fr; }
+    .bounty-table-head > :nth-child(4), .bounty-table-head > :nth-child(5), .bounty-table-row > :nth-child(4), .bounty-table-row > :nth-child(5) { display: none; }
+    .hero-main:hover, .hero-side:hover, .metric-card:hover, .bounty-card:hover, .event-card:hover, .protocol-card:hover, .vault-feature:hover, .vault-panel:hover, .bounty-overview:hover, .vault-copy:hover, .vault-visual:hover { transform: translateY(-2px); }
+}
+@media (max-width: 560px) {
+    .vault-feature-stack, .vault-process { grid-template-columns: 1fr; }
+    .vault-feature { min-height: 0; }
+    .vault-monogram { width: 116px; height: 116px; font-size: 3rem; }
 }
 </style>
 """
@@ -369,42 +419,75 @@ def render_command_room() -> None:
         unsafe_allow_html=True,
     )
 
-    main, side = st.columns([1.6, 0.7], gap="large")
-    with main:
-        st.markdown(
-            """
-            <div class="hero-main">
+    deployment_label = "PREPROD VERIFIED" if deployment["is_deployed"] else "PREPROD PENDING"
+    deployment_tone = "mint" if deployment["is_deployed"] else "amber"
+    key_label = owner_encryption["key_id"] if owner_encryption else "ENCRYPTION SETUP REQUIRED"
+    bounty_rows = "".join(
+        f"""
+        <div class="bounty-table-row">
+            <div><span class="bounty-name">{esc(bounty['title'])}</span><span class="bounty-id">{esc(bounty['id'])} · {esc(bounty['target_name'])}</span></div>
+            <div>{status_chip(str(bounty['status']))}</div>
+            <div class="mono">{esc(bounty['severity'])}</div>
+            <div class="mono">{esc(bounty['reward'])}</div>
+            <div class="mono">{esc(key_label)}</div>
+        </div>
+        """
+        for bounty in bounties
+    )
+    if not bounty_rows:
+        bounty_rows = "<div class='bounty-table-row'><div class='bounty-name'>No bounties published</div><div>—</div><div>—</div><div>—</div><div>—</div></div>"
+
+    st.markdown(
+        f"""
+        <div class="vault-bento">
+            <section class="vault-visual">
+                <div class="vault-tag">MIDNIGHT · PRIVATE VAULT</div>
+                <div class="vault-monogram">NB</div>
+                <h2>Night<br>Bounty</h2>
+            </section>
+            <section class="vault-copy">
                 <div class="eyebrow">PRIVATE RESPONSIBLE DISCLOSURE</div>
-                <h1>Find bugs.<br>Keep the exploit dark.</h1>
-                <p>NightBounty gives ethical researchers proof of first disclosure while project owners keep vulnerability details, identities, and shielded rewards out of public view.</p>
-                <div class="hero-signal"><span>NB</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with side:
-        contract_panel()
-
-    st.markdown("<div class='eyebrow'>LIVE WORKSPACE METRICS</div>", unsafe_allow_html=True)
-    metric_columns = st.columns(4)
-    metric_items = [
-        (summary["open_bounties"], "active bounties"),
-        (summary["private_reports"], "private reports"),
-        (summary["resolved"], "owner decisions"),
-        (summary["paid"], "shielded payouts"),
-    ]
-    for column, (value, label) in zip(metric_columns, metric_items):
-        with column:
-            st.markdown(
-                f"<div class='metric-card'><div class='metric-value'>{value}</div><div class='metric-label'>{label}</div></div>",
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("<br><div class='eyebrow'>BOUNTY BOARD</div>", unsafe_allow_html=True)
-    if not bounties:
-        st.info("No bounties have been published yet. The authorized owner can create one in Owner Console.")
-    for bounty in bounties:
-        render_bounty_card(bounty, owner_encryption["key_id"] if owner_encryption else None)
+                <h1>Proof before<br>public exposure.</h1>
+                <p>Researchers commit encrypted reports first. Owners privately verify, decide, and reward without turning vulnerabilities into public attack guides.</p>
+                <div class="bounty-meta"><span class="chip {deployment_tone}">{deployment_label}</span><span class="chip violet">{esc(key_label)}</span></div>
+            </section>
+            <section class="vault-feature-stack">
+                <div class="vault-feature"><h3>Encrypted intake</h3><p>Fresh X25519 envelopes protect every report before it is persisted.</p></div>
+                <div class="vault-feature"><h3>First disclosure</h3><p>Commitment receipts establish who reported before the issue is exposed.</p></div>
+                <div class="vault-feature"><h3>Shielded reward</h3><p>tNIGHT payout evidence avoids placing recipient identity on the public board.</p></div>
+            </section>
+        </div>
+        <div class="vault-lower">
+            <section class="vault-panel">
+                <div class="eyebrow">SECURE REPORTING FLOW</div>
+                <h2>Built for the moment before disclosure.</h2>
+                <p>Public bounty context, private exploit evidence, and an auditable resolution path in one focused workflow.</p>
+                <div class="vault-process">
+                    <div class="vault-step"><strong>01 · ENCRYPT</strong><span>Researcher locks report to owner key.</span></div>
+                    <div class="vault-step"><strong>02 · COMMIT</strong><span>Safe commitment proves first disclosure.</span></div>
+                    <div class="vault-step"><strong>03 · RESOLVE</strong><span>Owner accepts, rejects, or records payout.</span></div>
+                </div>
+            </section>
+            <section class="vault-panel">
+                <div class="eyebrow">WORKSPACE SIGNALS</div>
+                <h2>Live case position</h2>
+                <div class="vault-process">
+                    <div class="vault-step"><strong>{summary['open_bounties']}</strong><span>Active bounties</span></div>
+                    <div class="vault-step"><strong>{summary['private_reports']}</strong><span>Private reports</span></div>
+                    <div class="vault-step"><strong>{summary['resolved']}</strong><span>Owner decisions</span></div>
+                </div>
+                <p class="command-room-note" style="margin-top:1rem">{summary['paid']} shielded payout receipts recorded</p>
+            </section>
+        </div>
+        <section class="bounty-overview">
+            <div class="eyebrow">OPEN BOUNTIES OVERVIEW</div>
+            <h2>Responsible-disclosure board</h2>
+            <div class="bounty-table-head"><span>Bounty</span><span>Status</span><span>Severity</span><span>Reward</span><span>Encryption</span></div>
+            {bounty_rows}
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if owner_encryption:
         with st.expander("AstraCMS public report-encryption key", expanded=False):
@@ -419,9 +502,9 @@ def render_command_room() -> None:
             """
             <div class="protocol-card">
                 <h3>Privacy is the product.</h3>
-                <p><strong>Public:</strong> bounty status, safe resolution signals, and a deployment reference.</p>
-                <p><strong>Private:</strong> exploit content, reporter pseudonym, report commitment preimage, and shielded recipient address.</p>
-                <p><strong>Verifiable:</strong> a report was committed first, the owner made a decision, and a payout receipt was recorded.</p>
+                <p><strong>Public:</strong> bounty status, safe resolution signals, and deployment evidence.</p>
+                <p><strong>Private:</strong> exploit content, pseudonymous account details, report preimages, and shielded recipients.</p>
+                <p><strong>Verifiable:</strong> a commitment exists before the owner decision and payout receipt.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -442,9 +525,7 @@ def render_command_room() -> None:
                     st.info("No public-safe events have been recorded for this bounty yet.")
 
     if not deployment["is_deployed"]:
-        st.info(
-            "The app is intentionally in deployment-pending mode. Complete the PreProd flow in the Protocol & Deploy page and add the verified address/transaction before submitting to judges."
-        )
+        st.info("The visual workspace is ready, but deployment evidence is still pending. Use Protocol & Deploy and the local NightBounty deployer before claiming PreProd verified.")
 
 
 def current_researcher() -> dict[str, object] | None:
