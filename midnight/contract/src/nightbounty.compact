@@ -19,15 +19,14 @@ export ledger status: BountyState;
 export ledger owner: Bytes<32>;
 export ledger sequence: Counter;
 
-// Private report fields: never disclose raw vulnerabilities or recipient data.
+// Public commitments only: never disclose raw vulnerabilities, reporter identity,
+// or recipient data.
 export ledger reportCommitment: Maybe<Bytes<32>>;
-export ledger reporter: Maybe<Bytes<32>>;
 export ledger payoutCommitment: Maybe<Bytes<32>>;
 
 constructor() {
   status = BountyState.OPEN;
   reportCommitment = none<Bytes<32>>();
-  reporter = none<Bytes<32>>();
   payoutCommitment = none<Bytes<32>>();
   sequence.increment(1);
   owner = disclose(publicKey(localSecretKey(), sequence as Field as Bytes<32>));
@@ -35,12 +34,11 @@ constructor() {
 
 witness localSecretKey(): Bytes<32>;
 
-// The first reporter binds their private pseudonymous key and salted content
-// commitment. The encrypted report itself remains in off-chain ciphertext storage.
+// The first reporter binds a salted content commitment. The encrypted report itself
+// remains in off-chain ciphertext storage; only the commitment is intentionally public.
 export circuit submitReport(commitment: Bytes<32>): [] {
   assert(status == BountyState.OPEN, "Bounty is not accepting a first report");
-  reportCommitment = some<Bytes<32>>(commitment);
-  reporter = some<Bytes<32>>(publicKey(localSecretKey(), sequence as Field as Bytes<32>));
+  reportCommitment = some<Bytes<32>>(disclose(commitment));
   status = BountyState.REPORT_SUBMITTED;
 }
 
@@ -61,11 +59,11 @@ export circuit rejectReport(): [] {
 export circuit confirmPayout(receiptCommitment: Bytes<32>): [] {
   assert(status == BountyState.ACCEPTED, "Only accepted reports can be paid");
   assert(isOwner(), "Only the bounty owner can confirm a payout");
-  payoutCommitment = some<Bytes<32>>(receiptCommitment);
+  payoutCommitment = some<Bytes<32>>(disclose(receiptCommitment));
   status = BountyState.PAID;
 }
 
-export circuit isOwner(): Boolean {
+circuit isOwner(): Boolean {
   return owner == publicKey(localSecretKey(), sequence as Field as Bytes<32>);
 }
 
