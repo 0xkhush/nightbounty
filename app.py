@@ -180,19 +180,21 @@ h3 { letter-spacing: -0.02em; }
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: .9rem 1.1rem;
+    padding: .82rem 1rem;
     margin-bottom: 1.25rem;
-    border: 1px solid rgba(125,104,210,.32);
-    background: linear-gradient(100deg, rgba(45,35,83,.92), rgba(17,23,32,.94) 54%, rgba(44,32,74,.84));
+    border: 1px solid rgba(168,140,255,.28);
+    background: rgba(20,17,37,.82);
     border-radius: var(--radius-lg);
-    box-shadow: 0 18px 42px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.07);
+    box-shadow: 0 14px 34px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.055);
 }
-.command-brand { display: flex; align-items: center; gap: .68rem; min-width: max-content; }
-.command-mark { width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 50%; color: #fff; background: radial-gradient(circle at 35% 25%, #d7a6ff, #6f41d9 58%, #281653); box-shadow: 0 0 22px rgba(168,140,255,.45); font-family: 'DM Mono', monospace; font-weight: 700; }
+.command-brand { display: flex; align-items: center; gap: .72rem; min-width: max-content; }
+.command-brand > div:last-child { display: grid; gap: .1rem; }
+.command-mark { width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 9px; color: #fff; background: linear-gradient(145deg, #b89aff, #6741c7); box-shadow: 0 7px 16px rgba(104,65,199,.32); font-family: 'DM Mono', monospace; font-weight: 700; }
+.command-context { color: var(--violet); font: .58rem 'DM Mono', monospace; letter-spacing: .08em; }
 .command-brand strong { color: var(--paper); font-size: .95rem; letter-spacing: -.02em; }
-.command-pills { display: flex; gap: .45rem; flex-wrap: wrap; justify-content: flex-end; }
-.command-pill { color: var(--muted); border: 1px solid rgba(255,255,255,.08); background: rgba(5,8,13,.28); padding: .42rem .7rem; border-radius: 999px; font: .64rem 'DM Mono', monospace; letter-spacing: .06em; }
-.command-pill.active { color: var(--paper); border-color: rgba(168,140,255,.46); background: rgba(168,140,255,.12); }
+.command-pills { display: flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+.command-pill { color: var(--muted); border: 1px solid rgba(255,255,255,.08); background: rgba(5,8,13,.2); padding: .38rem .62rem; border-radius: 999px; font: .61rem 'DM Mono', monospace; letter-spacing: .06em; }
+.command-pill.active { color: var(--paper); border-color: rgba(168,140,255,.48); background: rgba(168,140,255,.14); }
 .hero-signal { position: absolute; right: 7%; top: 50%; width: 176px; height: 176px; transform: translateY(-50%) translateZ(44px); display: grid; place-items: center; border: 1px solid rgba(230,221,255,.7); border-radius: 42px; background: linear-gradient(145deg, rgba(224,197,255,.25), rgba(79,47,184,.36)); box-shadow: 0 0 0 18px rgba(168,140,255,.07), 0 0 0 38px rgba(45,225,194,.035), 0 26px 45px rgba(0,0,0,.24); rotate: -7deg; }
 .hero-signal::before { content: ""; position: absolute; inset: 12%; border: 1px solid rgba(45,225,194,.55); border-radius: 50%; }
 .hero-signal span { position: relative; z-index: 1; color: #fff; font-size: 3.5rem; font-weight: 700; letter-spacing: -.12em; text-shadow: 0 7px 22px rgba(0,0,0,.4); }
@@ -267,26 +269,28 @@ hr { border-color: var(--line); }
 .vault-bento { display: grid; grid-template-columns: 1.05fr 1.22fr .72fr; gap: 1rem; margin-bottom: 1rem; }
 .vault-visual, .vault-copy, .vault-feature, .vault-panel, .bounty-overview {
     border: 1px solid rgba(125,104,210,.28);
-    background: linear-gradient(135deg, rgba(28,24,46,.98), rgba(14,18,25,.97));
+    background: linear-gradient(135deg, rgba(24,21,39,.98), rgba(12,16,24,.98));
     border-radius: var(--radius-lg);
-    box-shadow: 0 22px 50px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05);
+    box-shadow: 0 18px 42px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.05);
 }
-.vault-visual { min-height: 284px; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 1.4rem; background: radial-gradient(circle at 67% 28%, rgba(158,116,255,.9), transparent 21%), radial-gradient(circle at 64% 65%, rgba(47,205,239,.7), transparent 28%), radial-gradient(circle at 20% 84%, rgba(221,80,231,.75), transparent 25%), linear-gradient(145deg, #26145e, #161342 72%); }
-.vault-visual::before { content: ""; position: absolute; width: 210px; height: 210px; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; left: -62px; top: 44px; box-shadow: 0 0 0 28px rgba(255,255,255,.04), 0 0 0 58px rgba(255,255,255,.025); }
-.vault-visual::after { content: ""; position: absolute; inset: 0; background: linear-gradient(130deg, transparent 44%, rgba(255,255,255,.12) 49%, transparent 53%); opacity: .65; }
+.vault-visual { min-height: 284px; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 1.4rem; background: radial-gradient(circle at 74% 30%, rgba(180,145,255,.62), transparent 19%), radial-gradient(circle at 58% 65%, rgba(101,68,203,.54), transparent 33%), linear-gradient(145deg, #25195a, #15112d 74%); }
+.vault-visual::before { content: ""; position: absolute; width: 210px; height: 210px; border: 1px solid rgba(255,255,255,.22); border-radius: 50%; left: -62px; top: 44px; box-shadow: 0 0 0 28px rgba(255,255,255,.035), 0 0 0 58px rgba(255,255,255,.018); }
+.vault-visual::after { content: ""; position: absolute; inset: 0; background: linear-gradient(130deg, transparent 44%, rgba(255,255,255,.08) 49%, transparent 53%); opacity: .55; }
 .vault-visual > * { position: relative; z-index: 1; }
-.vault-tag { color: rgba(255,255,255,.9); font: .72rem 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
-.vault-monogram { align-self: center; display: grid; place-items: center; width: 144px; height: 144px; border: 12px solid rgba(255,255,255,.92); border-radius: 42px; color: #fff; font-size: 4rem; font-weight: 700; letter-spacing: -.16em; transform: rotate(-8deg); text-shadow: 0 8px 20px rgba(0,0,0,.24); box-shadow: 0 18px 34px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.5); }
-.vault-visual h2 { margin: 0; font-size: 1.6rem; position: relative; z-index: 1; }
+.vault-tag { color: rgba(255,255,255,.86); font: .66rem 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
+.vault-monogram { align-self: center; display: grid; place-items: center; width: 130px; height: 130px; border: 9px solid rgba(255,255,255,.94); border-radius: 32px; color: #fff; font-size: 3.55rem; font-weight: 700; letter-spacing: -.16em; transform: rotate(-7deg); text-shadow: 0 8px 20px rgba(0,0,0,.24); box-shadow: 0 18px 34px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.5); }
+.vault-visual h2 { margin: 0; font-size: 1.5rem; position: relative; z-index: 1; }
+.vault-visual-caption { margin-top: -.65rem; color: rgba(255,255,255,.72); font-size: .78rem; line-height: 1.45; }
 .vault-copy { min-height: 284px; padding: 2rem 1.7rem; position: relative; overflow: hidden; }
 .vault-copy::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 15% 0, rgba(168,140,255,.32), transparent 34%); }
 .vault-copy > * { position: relative; z-index: 1; }
 .vault-copy h1 { margin: .4rem 0 1.1rem; max-width: 480px; font-size: clamp(2.1rem, 3.5vw, 3.7rem); line-height: .98; }
 .vault-copy p { max-width: 520px; font-size: 1rem; }
 .vault-feature-stack { display: grid; gap: .72rem; }
-.vault-feature { min-height: calc((284px - 1.44rem) / 3); padding: 1rem 1.05rem; display: flex; flex-direction: column; justify-content: center; }
-.vault-feature h3 { margin: 0 0 .3rem; font-size: 1rem; }
-.vault-feature p { margin: 0; font-size: .82rem; }
+.vault-feature { min-height: calc((284px - 1.44rem) / 3); padding: .88rem 1.02rem; display: flex; flex-direction: column; justify-content: center; }
+.vault-feature-index { color: var(--violet); font: .61rem 'DM Mono', monospace; letter-spacing: .08em; margin-bottom: .36rem; }
+.vault-feature h3 { margin: 0 0 .24rem; font-size: .98rem; }
+.vault-feature p { margin: 0; font-size: .79rem; line-height: 1.45; }
 .vault-feature:hover, .vault-panel:hover, .bounty-overview:hover, .vault-copy:hover, .vault-visual:hover { transform: translateY(-4px) rotateX(1deg); border-color: rgba(168,140,255,.52); box-shadow: 0 28px 54px rgba(0,0,0,.38), 0 0 30px rgba(168,140,255,.08); }
 .vault-lower { display: grid; grid-template-columns: 1.12fr .88fr; gap: 1rem; margin: 1rem 0; }
 .vault-panel { padding: 1.35rem; min-height: 205px; }
@@ -476,7 +480,10 @@ def render_command_room() -> None:
     st.markdown(
         """
         <div class="command-topbar">
-            <div class="command-brand"><div class="command-mark">N</div><strong>NightBounty Command Room</strong></div>
+            <div class="command-brand">
+                <div class="command-mark">N</div>
+                <div><span class="command-context">NIGHTBOUNTY / DISCLOSURE DESK</span><strong>Command Room</strong></div>
+            </div>
             <div class="command-pills">
                 <span class="command-pill active">PRIVATE VAULT</span>
                 <span class="command-pill">OWNER VERIFIED</span>
@@ -509,9 +516,9 @@ def render_command_room() -> None:
         f"""
         <div class="vault-bento">
             <section class="vault-visual">
-                <div class="vault-tag">MIDNIGHT · PRIVATE VAULT</div>
+                <div class="vault-tag">01 / PRIVATE INTAKE</div>
                 <div class="vault-monogram">NB</div>
-                <h2>Night<br>Bounty</h2>
+                <div><h2>Night<br>Bounty</h2><p class="vault-visual-caption">A proof-first workspace for responsible disclosure.</p></div>
             </section>
             <section class="vault-copy">
                 <div class="eyebrow">PRIVATE RESPONSIBLE DISCLOSURE</div>
@@ -520,9 +527,9 @@ def render_command_room() -> None:
                 <div class="bounty-meta"><span class="chip {deployment_tone}">{deployment_label}</span><span class="chip violet">{esc(key_label)}</span></div>
             </section>
             <section class="vault-feature-stack">
-                <div class="vault-feature"><h3>Encrypted intake</h3><p>Fresh X25519 envelopes protect every report before it is persisted.</p></div>
-                <div class="vault-feature"><h3>First disclosure</h3><p>Commitment receipts establish who reported before the issue is exposed.</p></div>
-                <div class="vault-feature"><h3>Shielded reward</h3><p>tNIGHT payout evidence avoids placing recipient identity on the public board.</p></div>
+                <div class="vault-feature"><div class="vault-feature-index">01 / ENCRYPT</div><h3>Encrypted intake</h3><p>Fresh X25519 envelopes protect every report before it is persisted.</p></div>
+                <div class="vault-feature"><div class="vault-feature-index">02 / COMMIT</div><h3>First disclosure</h3><p>Commitment receipts establish who reported before the issue is exposed.</p></div>
+                <div class="vault-feature"><div class="vault-feature-index">03 / RESOLVE</div><h3>Shielded reward</h3><p>tNIGHT payout evidence avoids placing recipient identity on the public board.</p></div>
             </section>
         </div>
         <div class="vault-lower">
