@@ -94,12 +94,34 @@ html, body, [class*="css"] {
 }
 section[data-testid="stMain"] { position: relative; z-index: 1; }
 section[data-testid="stSidebar"] {
-    background: #0d1219;
-    border-right: 1px solid var(--line);
+    background: radial-gradient(circle at 100% 10%, rgba(168,140,255,.25), transparent 29%), radial-gradient(circle at 8% 84%, rgba(92,53,179,.16), transparent 25%), linear-gradient(155deg, #17122b, #0c1018 62%);
+    border-right: 1px solid rgba(168,140,255,.3);
+    box-shadow: 12px 0 38px rgba(0,0,0,.18);
 }
 section[data-testid="stSidebar"] > div {
     padding-top: 1.35rem;
+    background: transparent;
 }
+section[data-testid="stSidebar"] h2 { color: var(--paper); letter-spacing: -.055em; }
+section[data-testid="stSidebar"] hr { border-color: rgba(168,140,255,.22); }
+section[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    margin: .12rem 0;
+    padding: .4rem .48rem;
+    transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+    background: rgba(168,140,255,.1);
+    border-color: rgba(168,140,255,.22);
+    transform: translateX(2px);
+}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {
+    background: linear-gradient(90deg, rgba(168,140,255,.22), rgba(45,225,194,.06));
+    border-color: rgba(168,140,255,.44);
+    box-shadow: inset 3px 0 0 var(--mint), 0 7px 16px rgba(0,0,0,.15);
+}
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p { color: var(--paper) !important; font-weight: 600; }
 .block-container {
     max-width: 1280px;
     padding-top: 4.75rem;
@@ -117,7 +139,7 @@ h3 { letter-spacing: -0.02em; }
     letter-spacing: .08em;
     text-transform: uppercase;
 }
-.brand-kicker { color: var(--mint); font-size: .72rem; }
+.brand-kicker { color: var(--violet); font-size: .72rem; }
 .eyebrow { color: var(--mint); font-size: .72rem; margin-bottom: .65rem; }
 .mono { color: var(--muted); font-size: .72rem; }
 
