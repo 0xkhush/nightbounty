@@ -280,6 +280,17 @@ hr { border-color: var(--line); }
 .bounty-name { color: var(--paper); font-weight: 600; }
 .bounty-id { color: var(--muted); display: block; margin-top: .2rem; font: .63rem 'DM Mono', monospace; }
 
+.page-vault-header { position: relative; overflow: hidden; display: flex; justify-content: space-between; gap: 1.25rem; align-items: flex-end; padding: 1.65rem 1.7rem; margin-bottom: 1.25rem; border: 1px solid rgba(125,104,210,.32); border-radius: var(--radius-lg); background: radial-gradient(circle at 85% 15%, rgba(168,140,255,.34), transparent 26%), linear-gradient(110deg, rgba(36,26,67,.96), rgba(14,18,25,.98) 64%); box-shadow: 0 23px 50px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.06); }
+.page-vault-header::after { content: ""; position: absolute; width: 180px; height: 180px; right: -48px; bottom: -98px; border: 1px solid rgba(45,225,194,.5); border-radius: 50%; box-shadow: 0 0 0 22px rgba(45,225,194,.055), 0 0 0 44px rgba(168,140,255,.035); }
+.page-vault-header > * { position: relative; z-index: 1; }
+.page-vault-header h1 { margin: .25rem 0 .55rem; font-size: clamp(2.25rem, 4vw, 3.7rem); line-height: 1; }
+.page-vault-header p { margin: 0; max-width: 720px; font-size: .98rem; }
+.page-vault-tags { display: flex; gap: .45rem; flex-wrap: wrap; justify-content: flex-end; padding-bottom: .25rem; }
+.page-vault-tag { border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(8,10,16,.26); color: var(--muted); padding: .42rem .68rem; font: .64rem 'DM Mono', monospace; letter-spacing: .06em; text-transform: uppercase; }
+.page-vault-tag.primary { border-color: rgba(45,225,194,.42); color: var(--mint); }
+div[data-testid="stForm"] { border: 1px solid rgba(125,104,210,.28); border-radius: var(--radius-lg); background: linear-gradient(135deg, rgba(28,24,46,.78), rgba(13,18,26,.86)); box-shadow: 0 18px 38px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.04); padding: 1.1rem 1.15rem; }
+button[data-baseweb="tab"] { border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important; }
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
@@ -292,6 +303,8 @@ hr { border-color: var(--line); }
     .command-pills { justify-content: flex-start; }
     .vault-bento, .vault-lower { grid-template-columns: 1fr; }
     .vault-visual, .vault-copy { min-height: 230px; }
+    .page-vault-header { align-items: flex-start; flex-direction: column; }
+    .page-vault-tags { justify-content: flex-start; }
     .vault-copy h1 { font-size: 2.45rem; }
     .vault-feature-stack { grid-template-columns: repeat(3, 1fr); }
     .vault-feature { min-height: 150px; }
@@ -311,6 +324,32 @@ st.markdown(CSS, unsafe_allow_html=True)
 
 def esc(value: object) -> str:
     return html.escape(str(value))
+
+
+def render_page_vault_header(
+    eyebrow: str,
+    title: str,
+    description: str,
+    primary_tag: str,
+    secondary_tag: str,
+) -> None:
+    """Render the shared rounded workspace header used outside Command Room."""
+    st.markdown(
+        f"""
+        <section class="page-vault-header">
+            <div>
+                <div class="eyebrow">{esc(eyebrow)}</div>
+                <h1>{esc(title)}</h1>
+                <p>{esc(description)}</p>
+            </div>
+            <div class="page-vault-tags">
+                <span class="page-vault-tag primary">{esc(primary_tag)}</span>
+                <span class="page-vault-tag">{esc(secondary_tag)}</span>
+            </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def status_chip(status: str) -> str:
@@ -594,9 +633,13 @@ def render_researcher_access() -> dict[str, object] | None:
 def render_submit_report() -> None:
     open_bounties = [bounty for bounty in list_bounties() if bounty["status"] == "OPEN"]
 
-    st.markdown("<div class='eyebrow'>RESEARCHER VAULT</div>", unsafe_allow_html=True)
-    st.header("Submit a private report")
-    st.caption("Choose one open bounty. Every report uses a fresh encryption envelope for the owner’s published X25519 public key before it is persisted.")
+    render_page_vault_header(
+        "RESEARCHER VAULT",
+        "Submit a private report",
+        "Choose one open bounty. Every report uses a fresh encryption envelope for the owner’s published X25519 public key before it is persisted.",
+        "PSEUDONYMOUS ACCESS",
+        "X25519 ENCRYPTED",
+    )
     researcher = render_researcher_access()
     if researcher is None:
         return
@@ -748,8 +791,13 @@ def lock_owner_console() -> None:
 
 
 def render_owner_console() -> None:
-    st.markdown("<div class='eyebrow'>OWNER CONSOLE</div>", unsafe_allow_html=True)
-    st.header("Private owner review")
+    render_page_vault_header(
+        "OWNER CONSOLE",
+        "Private owner review",
+        "Unlock the gated workspace to inspect encrypted disclosure evidence, decide reports, and record shielded payout receipts.",
+        "OWNER GATED",
+        "PRIVATE REVIEW",
+    )
     access_code = get_owner_access_code()
 
     if not st.session_state.get("is_owner"):
@@ -963,8 +1011,14 @@ def render_owner_console() -> None:
 
 def render_protocol_deploy() -> None:
     deployment = get_deployment()
-    st.markdown("<div class='eyebrow'>PROTOCOL & DEPLOY</div>", unsafe_allow_html=True)
-    st.header("What judges should verify")
+    render_page_vault_header(
+        "PROTOCOL & DEPLOY",
+        "What judges should verify",
+        "Review NightBounty’s private disclosure lifecycle, PreProd deployment evidence, and the exact path from local build to verified contract.",
+        "MIDNIGHT PREPROD",
+        "DEPLOYMENT EVIDENCE",
+    )
+
 
     left, right = st.columns([0.92, 1.08], gap="large")
     with left:
