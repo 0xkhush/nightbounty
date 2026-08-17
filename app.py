@@ -87,7 +87,7 @@ section[data-testid="stSidebar"] > div {
 }
 .block-container {
     max-width: 1280px;
-    padding-top: 2.0rem;
+    padding-top: 4.75rem;
     padding-bottom: 3.5rem;
 }
 h1, h2, h3, p { color: var(--paper); }
