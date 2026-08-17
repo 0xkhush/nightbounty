@@ -1,0 +1,1 @@
+"""NightBounty application package."""

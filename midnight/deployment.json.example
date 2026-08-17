@@ -1,0 +1,8 @@
+{
+  "network": "PreProd",
+  "contract_address": "",
+  "deployment_transaction": "",
+  "submit_report_transaction": "",
+  "accept_report_transaction": "",
+  "payout_transaction": ""
+}

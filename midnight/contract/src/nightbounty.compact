@@ -1,0 +1,74 @@
+// NightBounty — private responsible disclosure lifecycle
+// Contract source for Midnight Compact. This contract intentionally stores
+// commitments, authorization, and lifecycle state—not raw exploit details.
+
+pragma language_version 0.23;
+
+import CompactStandardLibrary;
+
+export enum BountyState {
+  OPEN,
+  REPORT_SUBMITTED,
+  ACCEPTED,
+  REJECTED,
+  PAID
+}
+
+// Publicly auditable lifecycle state.
+export ledger status: BountyState;
+export ledger owner: Bytes<32>;
+export ledger sequence: Counter;
+
+// Private report fields: never disclose raw vulnerabilities or recipient data.
+export ledger reportCommitment: Maybe<Bytes<32>>;
+export ledger reporter: Maybe<Bytes<32>>;
+export ledger payoutCommitment: Maybe<Bytes<32>>;
+
+constructor() {
+  status = BountyState.OPEN;
+  reportCommitment = none<Bytes<32>>();
+  reporter = none<Bytes<32>>();
+  payoutCommitment = none<Bytes<32>>();
+  sequence.increment(1);
+  owner = disclose(publicKey(localSecretKey(), sequence as Field as Bytes<32>));
+}
+
+witness localSecretKey(): Bytes<32>;
+
+// The first reporter binds their private pseudonymous key and salted content
+// commitment. The encrypted report itself remains in off-chain ciphertext storage.
+export circuit submitReport(commitment: Bytes<32>): [] {
+  assert(status == BountyState.OPEN, "Bounty is not accepting a first report");
+  reportCommitment = some<Bytes<32>>(commitment);
+  reporter = some<Bytes<32>>(publicKey(localSecretKey(), sequence as Field as Bytes<32>));
+  status = BountyState.REPORT_SUBMITTED;
+}
+
+export circuit acceptReport(): [] {
+  assert(status == BountyState.REPORT_SUBMITTED, "No submitted report to accept");
+  assert(isOwner(), "Only the bounty owner can accept a report");
+  status = BountyState.ACCEPTED;
+}
+
+export circuit rejectReport(): [] {
+  assert(status == BountyState.REPORT_SUBMITTED, "No submitted report to reject");
+  assert(isOwner(), "Only the bounty owner can reject a report");
+  status = BountyState.REJECTED;
+}
+
+// A shielded tNIGHT transfer is made by the owner through Lace. This circuit
+// records a payout receipt commitment without revealing the recipient or amount.
+export circuit confirmPayout(receiptCommitment: Bytes<32>): [] {
+  assert(status == BountyState.ACCEPTED, "Only accepted reports can be paid");
+  assert(isOwner(), "Only the bounty owner can confirm a payout");
+  payoutCommitment = some<Bytes<32>>(receiptCommitment);
+  status = BountyState.PAID;
+}
+
+export circuit isOwner(): Boolean {
+  return owner == publicKey(localSecretKey(), sequence as Field as Bytes<32>);
+}
+
+export circuit publicKey(secret: Bytes<32>, nonce: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([pad(32, "nightbounty:owner:"), nonce, secret]);
+}

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Local application data
+nightbounty.db
+*.db-shm
+*.db-wal
+
+# Local environment and Midnight deployment evidence
+.env
+midnight/deployment.json
+midnight/private-state/
+
+# Node / Compact artifacts
+node_modules/
+midnight/contract/managed/
+midnight/contract/dist/

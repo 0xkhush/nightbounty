@@ -1,0 +1,637 @@
+from __future__ import annotations
+
+import html
+import json
+from textwrap import dedent
+
+import streamlit as st
+
+from nightbounty.crypto import decrypt_report, encrypt_report, short_commitment
+from nightbounty.midnight import contract_label, get_deployment, lifecycle_chain_note
+from nightbounty.store import (
+    get_bounty,
+    get_report,
+    initialize,
+    list_events,
+    list_reports,
+    metrics,
+    reset_demo_data,
+    submit_report,
+    transition_report,
+)
+
+st.set_page_config(
+    page_title="NightBounty — private responsible disclosure",
+    page_icon="◒",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+initialize()
+
+
+CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+    --night: #0a0d12;
+    --panel: #111720;
+    --panel-hi: #171f2b;
+    --line: #293544;
+    --paper: #f4f1e8;
+    --muted: #9cacb9;
+    --mint: #2de1c2;
+    --amber: #f4bd57;
+    --coral: #ff765c;
+    --violet: #a88cff;
+}
+
+html, body, [class*="css"] {
+    font-family: 'Space Grotesk', sans-serif;
+}
+.stApp {
+    background: var(--night);
+    color: var(--paper);
+}
+.stApp::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: .28;
+    background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: 38px 38px;
+    mask-image: linear-gradient(to bottom, black, transparent 72%);
+}
+section[data-testid="stSidebar"] {
+    background: #0d1219;
+    border-right: 1px solid var(--line);
+}
+section[data-testid="stSidebar"] > div {
+    padding-top: 1.35rem;
+}
+.block-container {
+    max-width: 1280px;
+    padding-top: 2.0rem;
+    padding-bottom: 3.5rem;
+}
+h1, h2, h3, p { color: var(--paper); }
+h1 { letter-spacing: -0.05em; }
+h2 { letter-spacing: -0.035em; margin-top: .45rem; }
+h3 { letter-spacing: -0.02em; }
+[data-testid="stMarkdownContainer"] p { color: var(--muted); line-height: 1.55; }
+
+.brand-kicker, .eyebrow, .mono, .status-line, .event-time {
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.brand-kicker { color: var(--mint); font-size: .72rem; }
+.eyebrow { color: var(--mint); font-size: .72rem; margin-bottom: .65rem; }
+.mono { color: var(--muted); font-size: .72rem; }
+
+.hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(270px, .42fr);
+    gap: 1.2rem;
+    margin: .1rem 0 1.8rem;
+}
+.hero-main, .hero-side, .metric-card, .bounty-card, .event-card, .protocol-card {
+    border: 1px solid var(--line);
+    background: rgba(17, 23, 32, .94);
+}
+.hero-main { padding: 2.1rem 2.2rem 2rem; min-height: 282px; position: relative; overflow: hidden; }
+.hero-main::after {
+    content: "";
+    width: 240px; height: 240px;
+    position: absolute; right: -90px; bottom: -130px;
+    border: 1px solid rgba(45,225,194,.5); border-radius: 50%;
+    box-shadow: 0 0 0 42px rgba(45,225,194,.07), 0 0 0 84px rgba(45,225,194,.03);
+}
+.hero-main h1 { font-size: clamp(2.7rem, 5vw, 5rem); line-height: .9; margin: .1rem 0 1.15rem; max-width: 720px; position: relative; z-index: 1; }
+.hero-main p { font-size: 1.08rem; max-width: 620px; position: relative; z-index: 1; }
+.hero-side { padding: 1.45rem; display: flex; flex-direction: column; justify-content: space-between; min-height: 282px; }
+.hero-side h3 { font-size: 1.25rem; margin: .4rem 0; }
+.contract-address { font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--paper); padding: .75rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+
+.metric-card { padding: 1rem 1.05rem; min-height: 114px; }
+.metric-value { color: var(--paper); font-size: 2rem; font-weight: 700; letter-spacing: -.06em; margin: .3rem 0; }
+.metric-label { color: var(--muted); font-size: .82rem; }
+
+.bounty-card { padding: 1.45rem; margin: .75rem 0 1.2rem; position: relative; }
+.bounty-card h3 { font-size: 1.38rem; margin: .25rem 0 .4rem; }
+.bounty-card p { max-width: 800px; }
+.bounty-meta { display: flex; flex-wrap: wrap; gap: .45rem; margin: 1rem 0 .8rem; }
+.chip { border: 1px solid var(--line); color: var(--paper); padding: .26rem .52rem; font-family: 'DM Mono', monospace; font-size: .72rem; }
+.chip.mint { border-color: rgba(45,225,194,.48); color: var(--mint); }
+.chip.amber { border-color: rgba(244,189,87,.45); color: var(--amber); }
+.chip.coral { border-color: rgba(255,118,92,.48); color: var(--coral); }
+.chip.violet { border-color: rgba(168,140,255,.48); color: var(--violet); }
+
+.event-card { padding: 1rem 1.1rem; border-left: 3px solid var(--mint); margin-bottom: .65rem; }
+.event-card .event-title { color: var(--paper); font-weight: 600; margin: .22rem 0; }
+.event-time { color: var(--muted); font-size: .67rem; }
+.event-chain { color: var(--mint); font-family: 'DM Mono', monospace; font-size: .67rem; text-transform: uppercase; }
+
+.protocol-card { padding: 1.25rem; min-height: 100%; }
+.protocol-card h3 { margin-top: .15rem; }
+.protocol-card strong { color: var(--paper); }
+
+.stButton > button, .stFormSubmitButton > button {
+    border-radius: 4px;
+    border: 1px solid var(--mint);
+    background: var(--mint);
+    color: #08110f;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    padding: .55rem 1rem;
+}
+.stButton > button:hover, .stFormSubmitButton > button:hover {
+    border-color: var(--paper);
+    color: #08110f;
+    background: #7ef4df;
+}
+.stTextInput input, .stTextArea textarea, .stSelectbox [data-baseweb="select"] > div {
+    background: #0d131b !important;
+    border-color: var(--line) !important;
+    color: var(--paper) !important;
+    border-radius: 4px !important;
+}
+.stTextInput label, .stTextArea label, .stSelectbox label, .stCheckbox label {
+    color: var(--paper) !important;
+    font-size: .9rem !important;
+}
+[data-testid="stAlert"] { border-radius: 4px; }
+[data-testid="stExpander"] { border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+hr { border-color: var(--line); }
+
+@media (max-width: 850px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-main h1 { font-size: 3rem; }
+}
+</style>
+"""
+st.markdown(CSS, unsafe_allow_html=True)
+
+
+def esc(value: object) -> str:
+    return html.escape(str(value))
+
+
+def status_chip(status: str) -> str:
+    classes = {
+        "OPEN": "mint",
+        "REPORT_SUBMITTED": "amber",
+        "ACCEPTED": "violet",
+        "REJECTED": "coral",
+        "PAID": "mint",
+        "PREPROD_REQUIRED": "amber",
+    }
+    return f'<span class="chip {classes.get(status, "")}">{esc(status.replace("_", " "))}</span>'
+
+
+def contract_panel() -> None:
+    deployment = get_deployment()
+    if deployment["is_deployed"]:
+        status = "PREPROD VERIFIED"
+        address = str(deployment["contract_address"])
+        tx = str(deployment["deployment_transaction"])
+        body = f"""
+        <div class="hero-side">
+            <div>
+                <div class="eyebrow">MIDNIGHT NETWORK</div>
+                {status_chip(status)}
+                <h3>Private lifecycle active</h3>
+                <p>Contract deployment evidence is configured locally. Private report content stays out of the public chain.</p>
+            </div>
+            <div>
+                <div class="contract-address">{esc(address)}</div>
+                <div class="mono" style="margin-top:.7rem">DEPLOY TX · {esc(tx)}</div>
+            </div>
+        </div>
+        """
+    else:
+        body = """
+        <div class="hero-side">
+            <div>
+                <div class="eyebrow">MIDNIGHT NETWORK</div>
+                <span class="chip amber">PREPROD PACK READY</span>
+                <h3>Deploy before judging</h3>
+                <p>The Compact contract and PreProd configuration pack are included. This UI will not pretend local actions are public-chain transactions.</p>
+            </div>
+            <div>
+                <div class="contract-address">midnight/contract/src/nightbounty.compact</div>
+                <div class="mono" style="margin-top:.7rem">NEXT · COMPILE + DEPLOY TO PREPROD</div>
+            </div>
+        </div>
+        """
+    st.markdown(body, unsafe_allow_html=True)
+
+
+def render_event(event: dict[str, str]) -> None:
+    st.markdown(
+        f"""
+        <div class="event-card">
+            <div class="event-time">{esc(event['created_at'])} · {esc(event['event_type'].replace('_', ' '))}</div>
+            <div class="event-title">{esc(event['public_summary'])}</div>
+            <div class="event-chain">{esc(event['chain_status'].replace('_', ' '))}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_command_room() -> None:
+    bounty = get_bounty()
+    assert bounty is not None
+    deployment = get_deployment()
+    summary = metrics()
+
+    main, side = st.columns([1.6, 0.7], gap="large")
+    with main:
+        st.markdown(
+            """
+            <div class="hero-main">
+                <div class="eyebrow">PRIVATE RESPONSIBLE DISCLOSURE</div>
+                <h1>Find bugs.<br>Keep the exploit dark.</h1>
+                <p>NightBounty gives ethical researchers proof of first disclosure while project owners keep vulnerability details, identities, and shielded rewards out of public view.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with side:
+        contract_panel()
+
+    st.markdown("<div class='eyebrow'>LIVE CASE METRICS</div>", unsafe_allow_html=True)
+    metric_columns = st.columns(4)
+    metric_items = [
+        (summary["open_bounties"], "active bounty"),
+        (summary["private_reports"], "private reports"),
+        (summary["resolved"], "owner decisions"),
+        (summary["paid"], "shielded payouts"),
+    ]
+    for column, (value, label) in zip(metric_columns, metric_items):
+        with column:
+            st.markdown(
+                f"<div class='metric-card'><div class='metric-value'>{value}</div><div class='metric-label'>{label}</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<br><div class='eyebrow'>OPEN BOUNTY</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="bounty-card">
+            <div class="mono">{esc(bounty['id'])} · {esc(bounty['target_name'])}</div>
+            <h3>{esc(bounty['title'])}</h3>
+            <p>{esc(bounty['description'])}</p>
+            <div class="bounty-meta">
+                {status_chip(bounty['status'])}
+                <span class="chip coral">{esc(bounty['severity'])}</span>
+                <span class="chip mint">{esc(bounty['reward'])}</span>
+                <span class="chip">PRIVATE REPORTING</span>
+            </div>
+            <div class="mono">SCOPE · {esc(bounty['scope'])}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    left, right = st.columns([0.95, 1.05], gap="large")
+    with left:
+        st.markdown("<div class='eyebrow'>WHY MIDNIGHT</div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="protocol-card">
+                <h3>Privacy is the product.</h3>
+                <p><strong>Public:</strong> case status, safe resolution signals, and a deployment reference.</p>
+                <p><strong>Private:</strong> exploit content, reporter pseudonym, report commitment preimage, and shielded recipient address.</p>
+                <p><strong>Verifiable:</strong> a report was committed first, the owner made a decision, and a payout receipt was recorded.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with right:
+        st.markdown("<div class='eyebrow'>PUBLIC TIMELINE</div>", unsafe_allow_html=True)
+        events = list_events()
+        for event in events:
+            render_event(event)
+
+    if not deployment["is_deployed"]:
+        st.info(
+            "The app is intentionally in deployment-pending mode. Complete the PreProd flow in the Protocol & Deploy page and add the verified address/transaction before submitting to judges."
+        )
+
+
+def render_submit_report() -> None:
+    bounty = get_bounty()
+    assert bounty is not None
+    accepting_reports = bounty["status"] == "OPEN"
+
+    st.markdown("<div class='eyebrow'>RESEARCHER VAULT</div>", unsafe_allow_html=True)
+    st.header("Submit a private report")
+    st.caption("The report is encrypted before it is written to the local vault. Only ciphertext, a salted commitment, and a safe public event are persisted.")
+
+    if not accepting_reports:
+        st.warning(
+            f"This single-case MVP is currently {bounty['status'].replace('_', ' ').lower()}. The deployed contract accepts one first report for this bounty."
+        )
+        return
+
+    left, right = st.columns([1.35, 0.65], gap="large")
+    with right:
+        st.markdown(
+            """
+            <div class="protocol-card">
+                <div class="eyebrow">SAFE TESTING RULES</div>
+                <h3>Stay inside scope.</h3>
+                <p>Use the isolated training target only. Do not test production systems, extract data, or use denial-of-service techniques.</p>
+                <hr>
+                <p class="mono">PAYLOAD → AES-GCM / FERNET CIPHERTEXT</p>
+                <p class="mono">COMMITMENT → SHA-256(PAYLOAD + RANDOM SALT)</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with left:
+        with st.form("private_report_form", clear_on_submit=True):
+            reporter_alias = st.text_input("Researcher alias", placeholder="e.g. nocturne_17")
+            report_title = st.text_input("Report title", placeholder="Stored XSS through the editor preview field")
+            severity = st.selectbox("Suggested severity", ["Critical", "High", "Medium", "Low"])
+            impact = st.text_area("Impact", placeholder="Explain what an attacker could do if this issue were exploited.", height=110)
+            reproduction = st.text_area("Safe reproduction steps", placeholder="Use the isolated target and test account. Keep the proof of concept minimal.", height=150)
+            remediation = st.text_area("Suggested remediation", placeholder="Example: apply context-aware output encoding and a restrictive CSP.", height=100)
+            collaboration_key = st.text_input(
+                "Owner collaboration key",
+                type="password",
+                help="For the hackathon demo, share this only with the owner so they can decrypt the report. Production uses the project's public encryption key instead.",
+            )
+            accepted_rules = st.checkbox("I tested only the stated demo scope and did not access real user data.")
+            submitted = st.form_submit_button("Encrypt & commit private report", use_container_width=True)
+
+        if submitted:
+            if not all([reporter_alias.strip(), report_title.strip(), impact.strip(), reproduction.strip(), collaboration_key.strip()]):
+                st.error("Add your alias, title, impact, reproduction steps, and collaboration key.")
+            elif not accepted_rules:
+                st.error("Confirm the safe-testing rule before submitting.")
+            else:
+                payload = {
+                    "schema": "nightbounty.report.v1",
+                    "reporter_alias": reporter_alias.strip(),
+                    "report_title": report_title.strip(),
+                    "severity": severity,
+                    "impact": impact.strip(),
+                    "reproduction": reproduction.strip(),
+                    "remediation": remediation.strip(),
+                }
+                try:
+                    encrypted = encrypt_report(payload, collaboration_key)
+                    report = submit_report(
+                        bounty_id=bounty["id"],
+                        reporter_alias=reporter_alias,
+                        report_title=report_title,
+                        severity=severity,
+                        ciphertext=encrypted["ciphertext"],
+                        encryption_salt=encrypted["encryption_salt"],
+                        commitment=encrypted["commitment"],
+                        payload_digest=encrypted["payload_digest"],
+                        chain_status="PREPROD_MAPPED" if get_deployment()["is_deployed"] else "LOCAL_COMMITMENT",
+                    )
+                    st.success("Private report encrypted and committed to the NightBounty lifecycle.")
+                    st.markdown(
+                        f"""
+                        <div class="protocol-card">
+                            <div class="eyebrow">YOUR SAFE RECEIPT</div>
+                            <h3>{esc(report['id'])}</h3>
+                            <p class="mono">COMMITMENT · {esc(short_commitment(report['commitment']))}</p>
+                            <p class="mono">PAYLOAD DIGEST · {esc(short_commitment(report['payload_digest']))}</p>
+                            <p>{esc(lifecycle_chain_note('submitReport'))}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                except ValueError as exc:
+                    st.error(str(exc))
+
+
+def render_owner_console() -> None:
+    reports = list_reports()
+    st.markdown("<div class='eyebrow'>OWNER CONSOLE</div>", unsafe_allow_html=True)
+    st.header("Review without exposing the report")
+    st.caption("This page is the only place where the demo collaboration key is used to decrypt report ciphertext. Never paste a real vulnerability report into public tools.")
+
+    if not reports:
+        st.markdown(
+            """
+            <div class="protocol-card">
+                <h3>No report waiting.</h3>
+                <p>Use the Researcher Vault with a test report to exercise the private submission lifecycle.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    report_options = {f"{report['id']} · {report['status']} · {report['report_title']}": report["id"] for report in reports}
+    selected_label = st.selectbox("Private report", list(report_options))
+    report = get_report(report_options[selected_label])
+    assert report is not None
+
+    st.markdown(
+        f"""
+        <div class="bounty-card">
+            <div class="mono">{esc(report['id'])} · {esc(report['created_at'])}</div>
+            <h3>{esc(report['report_title'])}</h3>
+            <div class="bounty-meta">
+                {status_chip(report['status'])}
+                <span class="chip coral">{esc(report['severity'])}</span>
+                <span class="chip">RESEARCHER · {esc(report['reporter_alias'])}</span>
+            </div>
+            <div class="mono">COMMITMENT · {esc(short_commitment(report['commitment']))}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.form(f"unlock_{report['id']}"):
+        collaboration_key = st.text_input("Owner collaboration key", type="password")
+        unlocked = st.form_submit_button("Decrypt report locally")
+
+    if unlocked:
+        try:
+            st.session_state[f"payload_{report['id']}"] = decrypt_report(
+                report["ciphertext"], report["encryption_salt"], collaboration_key
+            )
+            st.success("Report decrypted for this browser session.")
+        except ValueError as exc:
+            st.error(str(exc))
+
+    payload = st.session_state.get(f"payload_{report['id']}")
+    if payload:
+        with st.expander("Private report content", expanded=True):
+            st.markdown(f"**Impact**  \n{esc(payload['impact'])}")
+            st.markdown(f"**Safe reproduction**  \n{esc(payload['reproduction'])}")
+            if payload.get("remediation"):
+                st.markdown(f"**Suggested remediation**  \n{esc(payload['remediation'])}")
+
+    chain_status = "PREPROD_MAPPED" if get_deployment()["is_deployed"] else "LOCAL_OWNER_ACTION"
+    if report["status"] == "SUBMITTED" and payload:
+        accept_column, reject_column = st.columns(2)
+        with accept_column:
+            if st.button("Accept report", type="primary", use_container_width=True):
+                transition_report(report["id"], "ACCEPTED", chain_status=chain_status)
+                st.success("Report accepted. Authorize the shielded reward next.")
+                st.rerun()
+        with reject_column:
+            if st.button("Reject report", use_container_width=True):
+                transition_report(report["id"], "REJECTED", chain_status=chain_status)
+                st.info("Report closed without publishing its contents.")
+                st.rerun()
+    elif report["status"] == "SUBMITTED":
+        st.info("Decrypt the report before making an owner decision.")
+
+    if report["status"] == "ACCEPTED":
+        st.markdown("<div class='eyebrow'>PAYOUT RECEIPT</div>", unsafe_allow_html=True)
+        st.info("Send the reward using Lace as a shielded tNIGHT transfer, then paste the transaction or receipt commitment below. The recipient address stays out of this public dashboard.")
+        with st.form(f"payout_{report['id']}"):
+            payout_reference = st.text_input("Shielded transfer transaction / receipt commitment", placeholder="Paste a verified reference")
+            paid = st.form_submit_button("Record shielded payout", use_container_width=True)
+        if paid:
+            if not payout_reference.strip():
+                st.error("Paste the verified payout transaction or receipt commitment.")
+            else:
+                transition_report(
+                    report["id"],
+                    "PAID",
+                    chain_status="PREPROD_PAYOUT" if get_deployment()["is_deployed"] else "LOCAL_PAYOUT_RECEIPT",
+                    payout_reference=payout_reference,
+                )
+                st.success("Payout receipt recorded. The public timeline contains no recipient identity.")
+                st.rerun()
+
+    if report["status"] == "PAID":
+        st.success("This report is resolved and paid. Publish only a redacted advisory after the project has patched the issue.")
+        if report.get("payout_reference"):
+            st.code(report["payout_reference"], language=None)
+
+
+def render_protocol_deploy() -> None:
+    deployment = get_deployment()
+    st.markdown("<div class='eyebrow'>PROTOCOL & DEPLOY</div>", unsafe_allow_html=True)
+    st.header("What judges should verify")
+
+    left, right = st.columns([0.92, 1.08], gap="large")
+    with left:
+        st.markdown(
+            """
+            <div class="protocol-card">
+                <h3>Public chain facts</h3>
+                <p>• Contract deployment on Midnight PreProd</p>
+                <p>• Bounty state transitions</p>
+                <p>• Salted report and payout commitments</p>
+                <hr>
+                <h3>Private by design</h3>
+                <p>• Raw exploit content</p>
+                <p>• Researcher identity and payout address</p>
+                <p>• Report salt and ciphertext decryption key</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with right:
+        status_text = "VERIFIED ON PREPROD" if deployment["is_deployed"] else "DEPLOYMENT PENDING"
+        st.markdown(
+            f"""
+            <div class="protocol-card">
+                <div class="eyebrow">NETWORK STATUS</div>
+                <h3>{status_text}</h3>
+                <p>{esc(contract_label())}</p>
+                <p class="mono">CONTRACT · {esc(deployment.get('contract_address') or 'not configured')}</p>
+                <p class="mono">DEPLOY TX · {esc(deployment.get('deployment_transaction') or 'not configured')}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<br><div class='eyebrow'>SOLO DEPLOYMENT CHECKLIST</div>", unsafe_allow_html=True)
+    checklist = [
+        "Open the current official Midnight `example-bboard` template and use its PreProd-compatible CLI/API workflow.",
+        "Install the supported Compact compiler, then compile `midnight/contract/src/nightbounty.compact`.",
+        "Run the official local Docker proof server and configure Lace for Midnight PreProd.",
+        "Get tNIGHT from the PreProd faucet and generate tDUST for fees in Lace.",
+        "Deploy the contract, then copy its verified address and deployment transaction into `midnight/deployment.json`.",
+        "Run the submit → accept → shielded payout demo and retain transaction screenshots for Devpost.",
+    ]
+    for index, item in enumerate(checklist, start=1):
+        st.markdown(
+            f"<div class='event-card'><div class='event-time'>STEP {index:02d}</div><div class='event-title'>{esc(item)}</div></div>",
+            unsafe_allow_html=True,
+        )
+
+    with st.expander("Compact contract lifecycle", expanded=False):
+        st.code(
+            dedent(
+                """
+                OPEN
+                  └── submitReport(commitment)
+                        └── REPORT_SUBMITTED
+                              ├── acceptReport() → ACCEPTED
+                              │                       └── confirmPayout(receiptCommitment) → PAID
+                              └── rejectReport() → REJECTED
+                """
+            ).strip(),
+            language="text",
+        )
+
+    with st.expander("Deployment metadata file", expanded=False):
+        st.code(json.dumps({
+            "network": "PreProd",
+            "contract_address": "<verified contract address>",
+            "deployment_transaction": "<verified transaction id>",
+        }, indent=2), language="json")
+        st.caption("Copy `midnight/deployment.json.example` to `midnight/deployment.json`. The real file is intentionally ignored by Git.")
+
+
+def render_sidebar() -> str:
+    deployment = get_deployment()
+    with st.sidebar:
+        st.markdown("<div class='brand-kicker'>MIDNIGHT TRACK · 2026</div>", unsafe_allow_html=True)
+        st.markdown("## NIGHT<br>BOUNTY", unsafe_allow_html=True)
+        st.markdown("<p class='mono'>PRIVATE RESPONSIBLE DISCLOSURE</p>", unsafe_allow_html=True)
+        st.markdown("---")
+        page = st.radio(
+            "Navigate",
+            ["Command Room", "Researcher Vault", "Owner Console", "Protocol & Deploy"],
+            label_visibility="collapsed",
+        )
+        st.markdown("---")
+        if deployment["is_deployed"]:
+            st.markdown("<span class='chip mint'>PREPROD VERIFIED</span>", unsafe_allow_html=True)
+        else:
+            st.markdown("<span class='chip amber'>DEPLOYMENT PENDING</span>", unsafe_allow_html=True)
+        st.caption(contract_label())
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Reset local demo data", use_container_width=True):
+            reset_demo_data()
+            for key in list(st.session_state):
+                if key.startswith("payload_"):
+                    del st.session_state[key]
+            st.rerun()
+        st.markdown("<p class='mono' style='margin-top:1.5rem'>BUILD FOR JUDGES</p>", unsafe_allow_html=True)
+        st.caption("Show the Compact contract, PreProd address, private report flow, and shielded payout receipt—not a fake dashboard.")
+    return page
+
+
+page = render_sidebar()
+
+if page == "Command Room":
+    render_command_room()
+elif page == "Researcher Vault":
+    render_submit_report()
+elif page == "Owner Console":
+    render_owner_console()
+else:
+    render_protocol_deploy()
+
+st.markdown("<br><hr><p class='mono'>NIGHTBOUNTY · PRIVATE RESPONSIBLE DISCLOSURE · HACKATHON MVP</p>", unsafe_allow_html=True)
