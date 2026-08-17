@@ -6,6 +6,12 @@ NightBounty uses a Compact contract to prove the bounty lifecycle without puttin
 OPEN → REPORT_SUBMITTED → ACCEPTED / REJECTED → PAID
 ```
 
+## Contract scope boundary
+
+`contract/src/nightbounty.compact` models **one bounty per deployed contract instance**. The Streamlit app can create multiple local demo bounties for a single owner so judges can see the product workflow, but those locally created records are not represented as separate PreProd deployments.
+
+To support several on-chain bounties, deploy one contract instance per bounty or implement and validate a future keyed multi-bounty Compact design. Do not claim the local workspace actions are chain transactions until the application invokes verified deployed bindings.
+
 ## What is private
 
 - Raw vulnerability report and proof-of-concept

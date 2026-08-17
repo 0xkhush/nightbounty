@@ -42,49 +42,81 @@ class NightBountyCoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             decrypt_report(encrypted["ciphertext"], encrypted["encryption_salt"], "incorrect-key")
 
-    def test_first_report_lifecycle_is_enforced(self) -> None:
+    def create_demo_bounty(self, title: str) -> dict[str, object]:
+        return store.create_bounty(
+            title=title,
+            target_name="AstraCMS · isolated staging target",
+            reward="150 tNIGHT",
+            severity="High",
+            description="A safe, isolated demo scenario for responsible testing.",
+            scope="Only the supplied staging URL and test accounts.",
+            owner_alias="AstraCMS Security Desk",
+        )
+
+    def test_multiple_bounties_are_isolated(self) -> None:
+        first_bounty = self.create_demo_bounty("Unsafe attachment preview")
+        second_bounty = self.create_demo_bounty("Misconfigured export endpoint")
+        self.assertNotEqual(first_bounty["id"], second_bounty["id"])
+        self.assertEqual(first_bounty["status"], "OPEN")
+        self.assertEqual(second_bounty["status"], "OPEN")
+        self.assertEqual(len(store.list_events(str(first_bounty["id"]))), 1)
+        self.assertEqual(len(store.list_events(str(second_bounty["id"]))), 1)
+        self.assertEqual(store.metrics()["open_bounties"], 3)
+
         encrypted = encrypt_report({"proof": "safe demo"}, "owner-demo-key")
-        report = store.submit_report(
-            bounty_id="BNTY-MDN-01",
+        first_report = store.submit_report(
+            bounty_id=str(first_bounty["id"]),
             reporter_alias="nocturne_17",
-            report_title="Stored XSS",
-            severity="Critical",
+            report_title="Unsafe attachment preview",
+            severity="High",
             ciphertext=encrypted["ciphertext"],
             encryption_salt=encrypted["encryption_salt"],
             commitment=encrypted["commitment"],
             payload_digest=encrypted["payload_digest"],
-            chain_status="LOCAL_COMMITMENT",
+            chain_status="LOCAL_DEMO_COMMITMENT",
         )
-        self.assertEqual(report["status"], "SUBMITTED")
-        bounty = store.get_bounty()
-        assert bounty is not None
-        self.assertEqual(bounty["status"], "REPORT_SUBMITTED")
+        second_report = store.submit_report(
+            bounty_id=str(second_bounty["id"]),
+            reporter_alias="another_researcher",
+            report_title="Export authorization gap",
+            severity="Medium",
+            ciphertext=encrypted["ciphertext"],
+            encryption_salt=encrypted["encryption_salt"],
+            commitment=encrypted["commitment"],
+            payload_digest=encrypted["payload_digest"],
+            chain_status="LOCAL_DEMO_COMMITMENT",
+        )
+        self.assertEqual(first_report["status"], "SUBMITTED")
+        self.assertEqual(second_report["status"], "SUBMITTED")
+        self.assertEqual([report["id"] for report in store.list_reports(str(first_bounty["id"]))], [first_report["id"]])
+        self.assertEqual([report["id"] for report in store.list_reports(str(second_bounty["id"]))], [second_report["id"]])
+        self.assertTrue(all(event["bounty_id"] == first_bounty["id"] for event in store.list_events(str(first_bounty["id"]))))
 
         with self.assertRaises(ValueError):
             store.submit_report(
-                bounty_id="BNTY-MDN-01",
+                bounty_id=str(first_bounty["id"]),
                 reporter_alias="second_researcher",
-                report_title="Second report",
+                report_title="Duplicate report",
                 severity="High",
                 ciphertext=encrypted["ciphertext"],
                 encryption_salt=encrypted["encryption_salt"],
                 commitment=encrypted["commitment"],
                 payload_digest=encrypted["payload_digest"],
-                chain_status="LOCAL_COMMITMENT",
+                chain_status="LOCAL_DEMO_COMMITMENT",
             )
 
-        store.transition_report(report["id"], "ACCEPTED", chain_status="LOCAL_OWNER_ACTION")
+        store.transition_report(first_report["id"], "ACCEPTED", chain_status="LOCAL_DEMO_OWNER_ACTION")
         store.transition_report(
-            report["id"],
+            first_report["id"],
             "PAID",
-            chain_status="LOCAL_PAYOUT_RECEIPT",
+            chain_status="LOCAL_DEMO_PAYOUT_RECEIPT",
             payout_reference="shielded-demo-receipt",
         )
-        updated = store.get_report(report["id"])
+        updated = store.get_report(first_report["id"])
         assert updated is not None
         self.assertEqual(updated["status"], "PAID")
         self.assertEqual(updated["payout_reference"], "shielded-demo-receipt")
-        self.assertEqual(store.metrics()["paid"], 1)
+        self.assertEqual(store.metrics(), {"open_bounties": 1, "private_reports": 2, "resolved": 1, "paid": 1})
 
 
 if __name__ == "__main__":

@@ -5,10 +5,11 @@ from __future__ import annotations
 import os
 import sqlite3
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DATABASE_PATH = Path(os.getenv("NIGHTBOUNTY_DB", ROOT / "nightbounty.db"))
@@ -22,6 +23,7 @@ def now() -> str:
 def connection() -> Iterator[sqlite3.Connection]:
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     try:
         yield conn
         conn.commit()
@@ -101,10 +103,14 @@ def seed_demo_data() -> None:
                 "AstraCMS · isolated staging target",
                 "250 tNIGHT",
                 "Critical",
-                "A deliberately vulnerable staging editor is available for responsible testing. "
-                "The winning researcher receives a shielded reward after private review.",
-                "Only https://staging.astracms.demo/editor using supplied test accounts. "
-                "No production systems, data extraction, or denial-of-service testing.",
+                (
+                    "A deliberately vulnerable staging editor is available for responsible testing. "
+                    "The winning researcher receives a shielded reward after private review."
+                ),
+                (
+                    "Only https://staging.astracms.demo/editor using supplied test accounts. "
+                    "No production systems, data extraction, or denial-of-service testing."
+                ),
                 "AstraCMS security desk",
                 "OPEN",
                 timestamp,
@@ -151,7 +157,7 @@ def _add_event(
     )
 
 
-def get_bounty(bounty_id: str = "BNTY-MDN-01") -> dict[str, Any] | None:
+def get_bounty(bounty_id: str) -> dict[str, Any] | None:
     with connection() as conn:
         row = conn.execute("SELECT * FROM bounties WHERE id = ?", (bounty_id,)).fetchone()
     return dict(row) if row else None
@@ -159,8 +165,74 @@ def get_bounty(bounty_id: str = "BNTY-MDN-01") -> dict[str, Any] | None:
 
 def list_bounties() -> list[dict[str, Any]]:
     with connection() as conn:
-        rows = conn.execute("SELECT * FROM bounties ORDER BY created_at DESC").fetchall()
+        rows = conn.execute(
+            """
+            SELECT * FROM bounties
+            ORDER BY CASE status WHEN 'OPEN' THEN 0 ELSE 1 END, created_at DESC, id DESC
+            """
+        ).fetchall()
     return [dict(row) for row in rows]
+
+
+def create_bounty(
+    *,
+    title: str,
+    target_name: str,
+    reward: str,
+    severity: str,
+    description: str,
+    scope: str,
+    owner_alias: str,
+) -> dict[str, Any]:
+    """Create an owner-managed local demo bounty and its safe public event."""
+    values = {
+        "title": title.strip(),
+        "target_name": target_name.strip(),
+        "reward": reward.strip(),
+        "severity": severity.strip(),
+        "description": description.strip(),
+        "scope": scope.strip(),
+        "owner_alias": owner_alias.strip(),
+    }
+    missing = [label.replace("_", " ") for label, value in values.items() if not value]
+    if missing:
+        raise ValueError(f"Add: {', '.join(missing)}.")
+
+    bounty_id = f"BNTY-{uuid.uuid4().hex[:8].upper()}"
+    timestamp = now()
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO bounties (
+                id, title, target_name, reward, severity, description, scope,
+                owner_alias, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                bounty_id,
+                values["title"],
+                values["target_name"],
+                values["reward"],
+                values["severity"],
+                values["description"],
+                values["scope"],
+                values["owner_alias"],
+                "OPEN",
+                timestamp,
+            ),
+        )
+        _add_event(
+            conn,
+            bounty_id=bounty_id,
+            report_id=None,
+            event_type="BOUNTY_OPENED",
+            public_summary="A new private-disclosure bounty was opened.",
+            private_note="Owner created this local demo bounty.",
+            chain_status="LOCAL_DEMO_BOUNTY",
+        )
+        row = conn.execute("SELECT * FROM bounties WHERE id = ?", (bounty_id,)).fetchone()
+    assert row is not None
+    return dict(row)
 
 
 def submit_report(
@@ -181,7 +253,7 @@ def submit_report(
         if bounty is None:
             raise ValueError("Bounty not found.")
         if bounty["status"] != "OPEN":
-            raise ValueError("This single-case bounty already has a private report in progress.")
+            raise ValueError("This bounty already has a private report in progress.")
 
         conn.execute(
             """
@@ -218,7 +290,7 @@ def submit_report(
     return dict(row)
 
 
-def list_reports(bounty_id: str = "BNTY-MDN-01") -> list[dict[str, Any]]:
+def list_reports(bounty_id: str) -> list[dict[str, Any]]:
     with connection() as conn:
         rows = conn.execute(
             "SELECT * FROM reports WHERE bounty_id = ? ORDER BY created_at DESC", (bounty_id,)
@@ -280,7 +352,7 @@ def transition_report(
         )
 
 
-def list_events(bounty_id: str = "BNTY-MDN-01", limit: int = 12) -> list[dict[str, Any]]:
+def list_events(bounty_id: str, limit: int = 12) -> list[dict[str, Any]]:
     with connection() as conn:
         rows = conn.execute(
             """
@@ -294,13 +366,16 @@ def list_events(bounty_id: str = "BNTY-MDN-01", limit: int = 12) -> list[dict[st
 
 def metrics() -> dict[str, int]:
     with connection() as conn:
+        open_bounty_count = conn.execute(
+            "SELECT COUNT(*) AS total FROM bounties WHERE status = 'OPEN'"
+        ).fetchone()["total"]
         report_count = conn.execute("SELECT COUNT(*) AS total FROM reports").fetchone()["total"]
         resolved_count = conn.execute(
             "SELECT COUNT(*) AS total FROM reports WHERE status IN ('ACCEPTED', 'PAID')"
         ).fetchone()["total"]
         paid_count = conn.execute("SELECT COUNT(*) AS total FROM reports WHERE status = 'PAID'").fetchone()["total"]
     return {
-        "open_bounties": 1,
+        "open_bounties": int(open_bounty_count),
         "private_reports": int(report_count),
         "resolved": int(resolved_count),
         "paid": int(paid_count),

@@ -11,9 +11,10 @@ from nightbounty.access import matches_owner_access_code, normalize_owner_access
 from nightbounty.crypto import decrypt_report, encrypt_report, short_commitment
 from nightbounty.midnight import contract_label, get_deployment, lifecycle_chain_note
 from nightbounty.store import (
-    get_bounty,
+    create_bounty,
     get_report,
     initialize,
+    list_bounties,
     list_events,
     list_reports,
     metrics,
@@ -244,9 +245,32 @@ def render_event(event: dict[str, str]) -> None:
     )
 
 
+def bounty_label(bounty: dict[str, object]) -> str:
+    return f"{bounty['id']} · {bounty['status']} · {bounty['title']}"
+
+
+def render_bounty_card(bounty: dict[str, object]) -> None:
+    st.markdown(
+        f"""
+        <div class="bounty-card">
+            <div class="mono">{esc(bounty['id'])} · {esc(bounty['target_name'])}</div>
+            <h3>{esc(bounty['title'])}</h3>
+            <p>{esc(bounty['description'])}</p>
+            <div class="bounty-meta">
+                {status_chip(str(bounty['status']))}
+                <span class="chip coral">{esc(bounty['severity'])}</span>
+                <span class="chip mint">{esc(bounty['reward'])}</span>
+                <span class="chip">PRIVATE REPORTING</span>
+            </div>
+            <div class="mono">SCOPE · {esc(bounty['scope'])}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_command_room() -> None:
-    bounty = get_bounty()
-    assert bounty is not None
+    bounties = list_bounties()
     deployment = get_deployment()
     summary = metrics()
 
@@ -265,10 +289,10 @@ def render_command_room() -> None:
     with side:
         contract_panel()
 
-    st.markdown("<div class='eyebrow'>LIVE CASE METRICS</div>", unsafe_allow_html=True)
+    st.markdown("<div class='eyebrow'>LIVE WORKSPACE METRICS</div>", unsafe_allow_html=True)
     metric_columns = st.columns(4)
     metric_items = [
-        (summary["open_bounties"], "active bounty"),
+        (summary["open_bounties"], "active bounties"),
         (summary["private_reports"], "private reports"),
         (summary["resolved"], "owner decisions"),
         (summary["paid"], "shielded payouts"),
@@ -280,24 +304,11 @@ def render_command_room() -> None:
                 unsafe_allow_html=True,
             )
 
-    st.markdown("<br><div class='eyebrow'>OPEN BOUNTY</div>", unsafe_allow_html=True)
-    st.markdown(
-        f"""
-        <div class="bounty-card">
-            <div class="mono">{esc(bounty['id'])} · {esc(bounty['target_name'])}</div>
-            <h3>{esc(bounty['title'])}</h3>
-            <p>{esc(bounty['description'])}</p>
-            <div class="bounty-meta">
-                {status_chip(bounty['status'])}
-                <span class="chip coral">{esc(bounty['severity'])}</span>
-                <span class="chip mint">{esc(bounty['reward'])}</span>
-                <span class="chip">PRIVATE REPORTING</span>
-            </div>
-            <div class="mono">SCOPE · {esc(bounty['scope'])}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown("<br><div class='eyebrow'>BOUNTY BOARD</div>", unsafe_allow_html=True)
+    if not bounties:
+        st.info("No bounties have been published yet. The authorized owner can create one in Owner Console.")
+    for bounty in bounties:
+        render_bounty_card(bounty)
 
     left, right = st.columns([0.95, 1.05], gap="large")
     with left:
@@ -306,7 +317,7 @@ def render_command_room() -> None:
             """
             <div class="protocol-card">
                 <h3>Privacy is the product.</h3>
-                <p><strong>Public:</strong> case status, safe resolution signals, and a deployment reference.</p>
+                <p><strong>Public:</strong> bounty status, safe resolution signals, and a deployment reference.</p>
                 <p><strong>Private:</strong> exploit content, reporter pseudonym, report commitment preimage, and shielded recipient address.</p>
                 <p><strong>Verifiable:</strong> a report was committed first, the owner made a decision, and a payout receipt was recorded.</p>
             </div>
@@ -315,9 +326,18 @@ def render_command_room() -> None:
         )
     with right:
         st.markdown("<div class='eyebrow'>PUBLIC TIMELINE</div>", unsafe_allow_html=True)
-        events = list_events()
-        for event in events:
-            render_event(event)
+        if bounties:
+            timeline_options = {bounty_label(bounty): bounty for bounty in bounties}
+            selected_label = st.selectbox("Bounty timeline", list(timeline_options), key="public_bounty_timeline")
+            if selected_label is not None:
+                selected_bounty = timeline_options[selected_label]
+                st.caption(f"Safe public events for {selected_bounty['id']} only.")
+                events = list_events(str(selected_bounty["id"]))
+                if events:
+                    for event in events:
+                        render_event(event)
+                else:
+                    st.info("No public-safe events have been recorded for this bounty yet.")
 
     if not deployment["is_deployed"]:
         st.info(
@@ -326,29 +346,33 @@ def render_command_room() -> None:
 
 
 def render_submit_report() -> None:
-    bounty = get_bounty()
-    assert bounty is not None
-    accepting_reports = bounty["status"] == "OPEN"
+    open_bounties = [bounty for bounty in list_bounties() if bounty["status"] == "OPEN"]
 
     st.markdown("<div class='eyebrow'>RESEARCHER VAULT</div>", unsafe_allow_html=True)
     st.header("Submit a private report")
-    st.caption("The report is encrypted before it is written to the local vault. Only ciphertext, a salted commitment, and a safe public event are persisted.")
+    st.caption("Choose one open bounty. The report is encrypted before it is written to the local vault; only ciphertext, a salted commitment, and a safe public event are persisted.")
 
-    if not accepting_reports:
-        st.warning(
-            f"This single-case MVP is currently {bounty['status'].replace('_', ' ').lower()}. The deployed contract accepts one first report for this bounty."
-        )
+    if not open_bounties:
+        st.warning("There are no open bounties right now. The owner can publish another scoped demo bounty in Owner Console.")
         return
+
+    bounty_options = {bounty_label(bounty): bounty for bounty in open_bounties}
+    selected_label = st.selectbox("Bounty to research", list(bounty_options), key="research_bounty")
+    if selected_label is None:
+        return
+    bounty = bounty_options[selected_label]
 
     left, right = st.columns([1.35, 0.65], gap="large")
     with right:
         st.markdown(
-            """
+            f"""
             <div class="protocol-card">
                 <div class="eyebrow">SAFE TESTING RULES</div>
-                <h3>Stay inside scope.</h3>
-                <p>Use the isolated training target only. Do not test production systems, extract data, or use denial-of-service techniques.</p>
+                <h3>{esc(bounty['target_name'])}</h3>
+                <p>{esc(bounty['description'])}</p>
+                <p class="mono">SCOPE · {esc(bounty['scope'])}</p>
                 <hr>
+                <p>Use only the stated demo scope. Do not test production systems, extract data, or use denial-of-service techniques.</p>
                 <p class="mono">PAYLOAD → AES-GCM / FERNET CIPHERTEXT</p>
                 <p class="mono">COMMITMENT → SHA-256(PAYLOAD + RANDOM SALT)</p>
             </div>
@@ -380,6 +404,7 @@ def render_submit_report() -> None:
             else:
                 payload = {
                     "schema": "nightbounty.report.v1",
+                    "bounty_id": bounty["id"],
                     "reporter_alias": reporter_alias.strip(),
                     "report_title": report_title.strip(),
                     "severity": severity,
@@ -390,7 +415,7 @@ def render_submit_report() -> None:
                 try:
                     encrypted = encrypt_report(payload, collaboration_key)
                     report = submit_report(
-                        bounty_id=bounty["id"],
+                        bounty_id=str(bounty["id"]),
                         reporter_alias=reporter_alias,
                         report_title=report_title,
                         severity=severity,
@@ -398,14 +423,15 @@ def render_submit_report() -> None:
                         encryption_salt=encrypted["encryption_salt"],
                         commitment=encrypted["commitment"],
                         payload_digest=encrypted["payload_digest"],
-                        chain_status="PREPROD_MAPPED" if get_deployment()["is_deployed"] else "LOCAL_COMMITMENT",
+                        chain_status="LOCAL_DEMO_COMMITMENT",
                     )
-                    st.success("Private report encrypted and committed to the NightBounty lifecycle.")
+                    st.success("Private report encrypted and committed to this bounty's local demo lifecycle.")
                     st.markdown(
                         f"""
                         <div class="protocol-card">
                             <div class="eyebrow">YOUR SAFE RECEIPT</div>
                             <h3>{esc(report['id'])}</h3>
+                            <p class="mono">BOUNTY · {esc(bounty['id'])}</p>
                             <p class="mono">COMMITMENT · {esc(short_commitment(report['commitment']))}</p>
                             <p class="mono">PAYLOAD DIGEST · {esc(short_commitment(report['payload_digest']))}</p>
                             <p>{esc(lifecycle_chain_note('submitReport'))}</p>
@@ -461,19 +487,82 @@ def render_owner_console() -> None:
 
     action_column, lock_column = st.columns([0.76, 0.24])
     with action_column:
-        st.caption("AstraCMS Security Desk session unlocked. This is the only place where the demo collaboration key decrypts report ciphertext locally.")
+        st.caption("AstraCMS Security Desk is the one authorized demo owner. Publish scoped bounties here, then decrypt and review reports only in their bounty context.")
     with lock_column:
         if st.button("Lock console", use_container_width=True):
             lock_owner_console()
             st.rerun()
 
-    reports = list_reports()
+    st.markdown("<br><div class='eyebrow'>PUBLISH DEMO BOUNTY</div>", unsafe_allow_html=True)
+    with st.expander("Create a new scoped bounty", expanded=False):
+        st.caption("This creates a local workspace bounty for the demo. It does not claim a new Midnight contract deployment.")
+        with st.form("create_bounty_form", clear_on_submit=True):
+            title_column, target_column = st.columns(2)
+            with title_column:
+                bounty_title = st.text_input("Bounty title", placeholder="Unsafe file attachment preview")
+            with target_column:
+                target_name = st.text_input("Isolated target", placeholder="AstraCMS · isolated staging target")
+            reward_column, severity_column = st.columns(2)
+            with reward_column:
+                reward = st.text_input("Reward", placeholder="150 tNIGHT")
+            with severity_column:
+                bounty_severity = st.selectbox("Maximum severity", ["Critical", "High", "Medium", "Low"]) or "Medium"
+            description = st.text_area("Public-safe description", placeholder="Describe the permitted test scenario without publishing exploit details.", height=90)
+            scope = st.text_area("Testing scope", placeholder="Only the isolated demo URL and supplied test accounts. No production systems or data extraction.", height=90)
+            owner_alias = st.text_input("Owner display name", value="AstraCMS Security Desk")
+            published = st.form_submit_button("Publish demo bounty", type="primary", use_container_width=True)
+
+        if published:
+            try:
+                created_bounty = create_bounty(
+                    title=bounty_title,
+                    target_name=target_name,
+                    reward=reward,
+                    severity=bounty_severity,
+                    description=description,
+                    scope=scope,
+                    owner_alias=owner_alias,
+                )
+                st.session_state["owner_selected_bounty"] = created_bounty["id"]
+                st.session_state["owner_bounty_notice"] = f"Published {created_bounty['id']} for the local demo workspace."
+                st.rerun()
+            except ValueError as exc:
+                st.error(str(exc))
+
+    bounties = list_bounties()
+    if not bounties:
+        st.info("No bounties have been published yet.")
+        return
+
+    notice = st.session_state.pop("owner_bounty_notice", None)
+    if isinstance(notice, str):
+        st.success(notice)
+
+    bounty_options = {bounty_label(bounty): bounty for bounty in bounties}
+    selected_bounty_id = st.session_state.get("owner_selected_bounty")
+    selected_index = next(
+        (index for index, bounty in enumerate(bounties) if bounty["id"] == selected_bounty_id),
+        0,
+    )
+    selected_label = st.selectbox(
+        "Bounty context",
+        list(bounty_options),
+        index=selected_index,
+        key="owner_bounty_context",
+    )
+    if selected_label is None:
+        return
+    bounty = bounty_options[selected_label]
+    st.session_state["owner_selected_bounty"] = bounty["id"]
+    render_bounty_card(bounty)
+
+    reports = list_reports(str(bounty["id"]))
     if not reports:
         st.markdown(
             """
             <div class="protocol-card">
-                <h3>No report waiting.</h3>
-                <p>Use the Researcher Vault with a test report to exercise the private submission lifecycle.</p>
+                <h3>No private report waiting for this bounty.</h3>
+                <p>Use Researcher Vault with a safe test report, or select another bounty context.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -524,7 +613,7 @@ def render_owner_console() -> None:
             if payload.get("remediation"):
                 st.markdown(f"**Suggested remediation**  \n{esc(payload['remediation'])}")
 
-    chain_status = "PREPROD_MAPPED" if get_deployment()["is_deployed"] else "LOCAL_OWNER_ACTION"
+    chain_status = "LOCAL_DEMO_OWNER_ACTION"
     if report["status"] == "SUBMITTED" and payload:
         accept_column, reject_column = st.columns(2)
         with accept_column:
@@ -553,7 +642,7 @@ def render_owner_console() -> None:
                 transition_report(
                     report["id"],
                     "PAID",
-                    chain_status="PREPROD_PAYOUT" if get_deployment()["is_deployed"] else "LOCAL_PAYOUT_RECEIPT",
+                    chain_status="LOCAL_DEMO_PAYOUT_RECEIPT",
                     payout_reference=payout_reference,
                 )
                 st.success("Payout receipt recorded. The public timeline contains no recipient identity.")
@@ -577,7 +666,7 @@ def render_protocol_deploy() -> None:
             <div class="protocol-card">
                 <h3>Public chain facts</h3>
                 <p>• Contract deployment on Midnight PreProd</p>
-                <p>• Bounty state transitions</p>
+                <p>• One deployed bounty lifecycle</p>
                 <p>• Salted report and payout commitments</p>
                 <hr>
                 <h3>Private by design</h3>
@@ -602,6 +691,8 @@ def render_protocol_deploy() -> None:
             """,
             unsafe_allow_html=True,
         )
+
+    st.info("The Owner Console can create multiple local demo bounties for one organization. The current Compact source models one bounty per deployment, so the app does not label those new local records as chain transactions.")
 
     st.markdown("<br><div class='eyebrow'>SOLO DEPLOYMENT CHECKLIST</div>", unsafe_allow_html=True)
     checklist = [

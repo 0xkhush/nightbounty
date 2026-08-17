@@ -19,13 +19,13 @@ A vulnerability report is exactly the kind of data that should **not** be placed
 
 ## Solo-hackathon MVP
 
-The app intentionally demonstrates one fully working bounty case:
+The Streamlit workspace lets one authorized organization publish several **local demo bounties**. Each bounty independently follows one focused, private first-report lifecycle:
 
 ```text
 OPEN → REPORT_SUBMITTED → ACCEPTED / REJECTED → PAID
 ```
 
-A one-bounty Compact contract is a deliberate scope decision: it produces a real, understandable Midnight lifecycle in two hours rather than a broad marketplace with shallow or fake integration.
+This is deliberately a multi-bounty workspace for one owner—not a public multi-organization marketplace. The Compact source remains one deployed bounty lifecycle per contract instance; locally published demo bounties are clearly marked as local and are not presented as separate on-chain deployments.
 
 ## Run the Streamlit app
 
@@ -67,14 +67,14 @@ The access code is read server-side and is never committed. This is a focused ha
 
 ### Demo flow
 
-1. Open **Researcher Vault** as `nocturne_17` and submit a safe test report for the isolated AstraCMS training target.
-2. Use a demo collaboration key of at least eight characters. It encrypts the report before persistence.
-3. Copy the salted report commitment shown in the receipt.
-4. Open **Owner Console** as the separate `AstraCMS Security Desk` role and enter the server-configured owner access code.
-5. Enter the same collaboration key to decrypt the report locally for this browser session.
-6. Accept the report.
-7. After making a shielded tNIGHT transfer in Lace, paste the verified transaction/receipt commitment and mark the payout as complete.
-8. Lock the owner console, then return to **Command Room** and show the safe public timeline.
+1. Open **Owner Console** as `AstraCMS Security Desk` and enter the server-configured owner access code.
+2. Create two scoped local demo bounties, such as a safe attachment-preview case and an export-authorization case.
+3. Open **Researcher Vault** as `nocturne_17`, select one open bounty, and submit a safe test report.
+4. Use a demo collaboration key of at least eight characters. It encrypts the report before persistence.
+5. Copy the salted report commitment shown in the receipt.
+6. Return to **Owner Console**, select the same bounty context, and enter the collaboration key to decrypt the report locally for this browser session.
+7. Accept the report. After a shielded tNIGHT transfer in Lace, paste the verified transaction/receipt commitment and mark the payout as complete.
+8. Lock the owner console, then use **Command Room** to show that each bounty has its own safe public timeline.
 
 > Never use a real target, production credential, real exploit payload, or sensitive data in the demo.
 
@@ -105,7 +105,7 @@ rejectReport()
 confirmPayout(receiptCommitment)
 ```
 
-For the hackathon MVP, the contract authorizes the bounty state transition and records privacy-preserving commitments. The actual reward is sent as a shielded tNIGHT transfer through Lace, then the owner commits a payout receipt. Native contract escrow is a future enhancement after validating the current Compact token-transfer primitive.
+For the hackathon MVP, the Compact contract source authorizes one deployed bounty state transition and records privacy-preserving commitments. The Streamlit multi-bounty board is local demo workspace data until each bounty receives its own verified contract deployment or a future multi-bounty Compact contract is implemented. The actual reward is sent as a shielded tNIGHT transfer through Lace, then the owner commits a payout receipt. Native contract escrow is a future enhancement after validating the current Compact token-transfer primitive.
 
 ## Project structure
 
