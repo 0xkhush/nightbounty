@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import html
 import json
+import os
 from textwrap import dedent
 
 import streamlit as st
 
+from nightbounty.access import matches_owner_access_code, normalize_owner_access_code
 from nightbounty.crypto import decrypt_report, encrypt_report, short_commitment
 from nightbounty.midnight import contract_label, get_deployment, lifecycle_chain_note
 from nightbounty.store import (
@@ -358,7 +360,7 @@ def render_submit_report() -> None:
         with st.form("private_report_form", clear_on_submit=True):
             reporter_alias = st.text_input("Researcher alias", placeholder="e.g. nocturne_17")
             report_title = st.text_input("Report title", placeholder="Stored XSS through the editor preview field")
-            severity = st.selectbox("Suggested severity", ["Critical", "High", "Medium", "Low"])
+            severity = st.selectbox("Suggested severity", ["Critical", "High", "Medium", "Low"]) or "Low"
             impact = st.text_area("Impact", placeholder="Explain what an attacker could do if this issue were exploited.", height=110)
             reproduction = st.text_area("Safe reproduction steps", placeholder="Use the isolated target and test account. Keep the proof of concept minimal.", height=150)
             remediation = st.text_area("Suggested remediation", placeholder="Example: apply context-aware output encoding and a restrictive CSP.", height=100)
@@ -415,12 +417,57 @@ def render_submit_report() -> None:
                     st.error(str(exc))
 
 
-def render_owner_console() -> None:
-    reports = list_reports()
-    st.markdown("<div class='eyebrow'>OWNER CONSOLE</div>", unsafe_allow_html=True)
-    st.header("Review without exposing the report")
-    st.caption("This page is the only place where the demo collaboration key is used to decrypt report ciphertext. Never paste a real vulnerability report into public tools.")
+def get_owner_access_code() -> str | None:
+    """Read the owner gate from a server-side environment variable or secret."""
+    configured = os.getenv("NIGHTBOUNTY_OWNER_ACCESS_CODE")
+    if not configured:
+        try:
+            configured = st.secrets.get("owner_access_code")
+        except FileNotFoundError:
+            configured = None
+    return normalize_owner_access_code(configured)
 
+
+def lock_owner_console() -> None:
+    """Remove authorization and any decrypted report content from this session."""
+    st.session_state.pop("is_owner", None)
+    for key in list(st.session_state):
+        if isinstance(key, str) and key.startswith("payload_"):
+            del st.session_state[key]
+
+
+def render_owner_console() -> None:
+    st.markdown("<div class='eyebrow'>OWNER CONSOLE</div>", unsafe_allow_html=True)
+    st.header("Private owner review")
+    access_code = get_owner_access_code()
+
+    if not st.session_state.get("is_owner"):
+        st.caption("AstraCMS Security Desk only. Report metadata and ciphertext remain unavailable until the owner gate is unlocked.")
+        if not access_code:
+            st.warning("Owner access is not configured. Add a private code before this console can display reports.")
+            st.code('owner_access_code = "use-a-long-random-private-code"', language="toml")
+            st.caption("For local use, set `NIGHTBOUNTY_OWNER_ACCESS_CODE`. On Streamlit Community Cloud, add `owner_access_code` in App settings → Secrets.")
+            return
+
+        with st.form("owner_access_gate"):
+            submitted_code = st.text_input("Owner access code", type="password")
+            unlocked = st.form_submit_button("Unlock owner console", type="primary", use_container_width=True)
+        if unlocked:
+            if matches_owner_access_code(submitted_code, access_code):
+                st.session_state["is_owner"] = True
+                st.rerun()
+            st.error("That owner access code is not valid.")
+        return
+
+    action_column, lock_column = st.columns([0.76, 0.24])
+    with action_column:
+        st.caption("AstraCMS Security Desk session unlocked. This is the only place where the demo collaboration key decrypts report ciphertext locally.")
+    with lock_column:
+        if st.button("Lock console", use_container_width=True):
+            lock_owner_console()
+            st.rerun()
+
+    reports = list_reports()
     if not reports:
         st.markdown(
             """
@@ -435,6 +482,8 @@ def render_owner_console() -> None:
 
     report_options = {f"{report['id']} · {report['status']} · {report['report_title']}": report["id"] for report in reports}
     selected_label = st.selectbox("Private report", list(report_options))
+    if selected_label is None:
+        return
     report = get_report(report_options[selected_label])
     assert report is not None
 
@@ -614,13 +663,11 @@ def render_sidebar() -> str:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Reset local demo data", use_container_width=True):
             reset_demo_data()
-            for key in list(st.session_state):
-                if key.startswith("payload_"):
-                    del st.session_state[key]
+            lock_owner_console()
             st.rerun()
         st.markdown("<p class='mono' style='margin-top:1.5rem'>BUILD FOR JUDGES</p>", unsafe_allow_html=True)
         st.caption("Show the Compact contract, PreProd address, private report flow, and shielded payout receipt—not a fake dashboard.")
-    return page
+    return page or "Command Room"
 
 
 page = render_sidebar()

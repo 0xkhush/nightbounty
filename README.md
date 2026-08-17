@@ -46,16 +46,35 @@ streamlit run app.py
 
 Open the local URL Streamlit prints. The SQLite database is created automatically as `nightbounty.db`; it is ignored by Git.
 
+### Owner-console access
+
+The public dashboard is intentionally viewable by everyone, but report metadata, ciphertext, decryption, and lifecycle decisions are behind an owner gate.
+
+Set a long, private access code by **one** of these methods before opening **Owner Console**:
+
+```bash
+export NIGHTBOUNTY_OWNER_ACCESS_CODE="your-long-random-owner-code"
+streamlit run app.py
+```
+
+Or copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and replace its example value. For Streamlit Community Cloud, add this in **App settings → Secrets**:
+
+```toml
+owner_access_code = "your-long-random-owner-code"
+```
+
+The access code is read server-side and is never committed. This is a focused hackathon gate—not a production identity system. In the production design, authorization is wallet-bound and enforced by the Midnight contract owner witness; report content is encrypted to the owner’s public key.
+
 ### Demo flow
 
-1. Open **Researcher Vault**.
-2. Submit a safe test report for the isolated AstraCMS training target.
-3. Use a demo collaboration key of at least eight characters. It encrypts the report before persistence.
-4. Copy the salted report commitment shown in the receipt.
-5. Open **Owner Console** and enter the same collaboration key to decrypt the report locally for the browser session.
+1. Open **Researcher Vault** as `nocturne_17` and submit a safe test report for the isolated AstraCMS training target.
+2. Use a demo collaboration key of at least eight characters. It encrypts the report before persistence.
+3. Copy the salted report commitment shown in the receipt.
+4. Open **Owner Console** as the separate `AstraCMS Security Desk` role and enter the server-configured owner access code.
+5. Enter the same collaboration key to decrypt the report locally for this browser session.
 6. Accept the report.
 7. After making a shielded tNIGHT transfer in Lace, paste the verified transaction/receipt commitment and mark the payout as complete.
-8. Return to **Command Room** and show the safe public timeline.
+8. Lock the owner console, then return to **Command Room** and show the safe public timeline.
 
 > Never use a real target, production credential, real exploit payload, or sensitive data in the demo.
 
