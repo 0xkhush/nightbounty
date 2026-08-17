@@ -131,7 +131,7 @@ h3 { letter-spacing: -0.02em; }
     transform-style: preserve-3d;
     transition: transform .28s cubic-bezier(.2,.8,.2,1), border-color .28s ease, box-shadow .28s ease;
 }
-.hero-main { padding: 2.1rem 2.2rem 2rem; min-height: 282px; position: relative; overflow: hidden; box-shadow: 0 28px 60px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.055); }
+.hero-main { padding: 2.1rem 2.2rem 2rem; min-height: 282px; position: relative; overflow: hidden; background: radial-gradient(circle at 78% 42%, rgba(95,73,224,.6), transparent 19%), radial-gradient(circle at 92% 78%, rgba(45,225,194,.28), transparent 30%), linear-gradient(135deg, #211b3a, #111720 62%); box-shadow: 0 28px 60px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.055); }
 .hero-main::after {
     content: "";
     width: 240px; height: 240px;
@@ -148,6 +148,28 @@ h3 { letter-spacing: -0.02em; }
 .hero-side:hover { transform: translateY(-5px) rotateX(1deg) rotateY(.7deg); border-color: rgba(168,140,255,.46); box-shadow: 0 30px 58px rgba(0,0,0,.36), 0 0 38px rgba(168,140,255,.08); }
 .hero-side h3 { font-size: 1.25rem; margin: .4rem 0; }
 .contract-address { font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--paper); padding: .75rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+
+.command-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .9rem 1.1rem;
+    margin-bottom: 1.25rem;
+    border: 1px solid rgba(125,104,210,.32);
+    background: linear-gradient(100deg, rgba(45,35,83,.92), rgba(17,23,32,.94) 54%, rgba(44,32,74,.84));
+    box-shadow: 0 18px 42px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.command-brand { display: flex; align-items: center; gap: .68rem; min-width: max-content; }
+.command-mark { width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 50%; color: #fff; background: radial-gradient(circle at 35% 25%, #d7a6ff, #6f41d9 58%, #281653); box-shadow: 0 0 22px rgba(168,140,255,.45); font-family: 'DM Mono', monospace; font-weight: 700; }
+.command-brand strong { color: var(--paper); font-size: .95rem; letter-spacing: -.02em; }
+.command-pills { display: flex; gap: .45rem; flex-wrap: wrap; justify-content: flex-end; }
+.command-pill { color: var(--muted); border: 1px solid rgba(255,255,255,.08); background: rgba(5,8,13,.28); padding: .42rem .7rem; border-radius: 999px; font: .64rem 'DM Mono', monospace; letter-spacing: .06em; }
+.command-pill.active { color: var(--paper); border-color: rgba(168,140,255,.46); background: rgba(168,140,255,.12); }
+.hero-signal { position: absolute; right: 7%; top: 50%; width: 176px; height: 176px; transform: translateY(-50%) translateZ(44px); display: grid; place-items: center; border: 1px solid rgba(230,221,255,.7); border-radius: 42px; background: linear-gradient(145deg, rgba(224,197,255,.25), rgba(79,47,184,.36)); box-shadow: 0 0 0 18px rgba(168,140,255,.07), 0 0 0 38px rgba(45,225,194,.035), 0 26px 45px rgba(0,0,0,.24); rotate: -7deg; }
+.hero-signal::before { content: ""; position: absolute; inset: 12%; border: 1px solid rgba(45,225,194,.55); border-radius: 50%; }
+.hero-signal span { position: relative; z-index: 1; color: #fff; font-size: 3.5rem; font-weight: 700; letter-spacing: -.12em; text-shadow: 0 7px 22px rgba(0,0,0,.4); }
+.hero-main h1, .hero-main p, .hero-main .eyebrow { max-width: 63%; }
 
 .metric-card { padding: 1rem 1.05rem; min-height: 114px; }
 .metric-card:hover { transform: translateY(-5px) rotateX(2deg); border-color: rgba(45,225,194,.4); box-shadow: 0 24px 42px rgba(0,0,0,.34), 0 0 26px rgba(45,225,194,.06); }
@@ -212,12 +234,18 @@ h3 { letter-spacing: -0.02em; }
 [data-testid="stExpander"] { border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
 hr { border-color: var(--line); }
 
+.command-room-note { color: var(--muted); font: .68rem 'DM Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
 @media (max-width: 850px) {
     .hero { grid-template-columns: 1fr; }
     .hero-main h1 { font-size: 3rem; }
+    .hero-main h1, .hero-main p, .hero-main .eyebrow { max-width: 100%; }
+    .hero-signal { opacity: .28; right: -1.8rem; width: 130px; height: 130px; }
+    .command-topbar { align-items: flex-start; flex-direction: column; }
+    .command-pills { justify-content: flex-start; }
     .hero-main:hover, .hero-side:hover, .metric-card:hover, .bounty-card:hover, .event-card:hover, .protocol-card:hover { transform: translateY(-2px); }
 }
 </style>
@@ -327,6 +355,20 @@ def render_command_room() -> None:
     deployment = get_deployment()
     summary = metrics()
 
+    st.markdown(
+        """
+        <div class="command-topbar">
+            <div class="command-brand"><div class="command-mark">N</div><strong>NightBounty Command Room</strong></div>
+            <div class="command-pills">
+                <span class="command-pill active">PRIVATE VAULT</span>
+                <span class="command-pill">OWNER VERIFIED</span>
+                <span class="command-pill">MIDNIGHT READY</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     main, side = st.columns([1.6, 0.7], gap="large")
     with main:
         st.markdown(
@@ -335,6 +377,7 @@ def render_command_room() -> None:
                 <div class="eyebrow">PRIVATE RESPONSIBLE DISCLOSURE</div>
                 <h1>Find bugs.<br>Keep the exploit dark.</h1>
                 <p>NightBounty gives ethical researchers proof of first disclosure while project owners keep vulnerability details, identities, and shielded rewards out of public view.</p>
+                <div class="hero-signal"><span>NB</span></div>
             </div>
             """,
             unsafe_allow_html=True,
