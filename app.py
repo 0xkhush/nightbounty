@@ -837,11 +837,11 @@ def render_protocol_deploy() -> None:
 
     st.markdown("<br><div class='eyebrow'>SOLO DEPLOYMENT CHECKLIST</div>", unsafe_allow_html=True)
     checklist = [
-        "Open the current official Midnight `example-bboard` template and use its PreProd-compatible CLI/API workflow.",
-        "Install the supported Compact compiler, then compile `midnight/contract/src/nightbounty.compact`.",
-        "Run the official local Docker proof server and configure Lace for Midnight PreProd.",
-        "Get tNIGHT from the PreProd faucet and generate tDUST for fees in Lace.",
-        "Deploy the contract, then copy its verified address and deployment transaction into `midnight/deployment.json`.",
+        "From `midnight/deployer`, run `npm ci`, then `npm run proof-server:up`.",
+        "Run `npm run deploy` to create/recover a local PreProd wallet, request tNIGHT, generate tDUST, and deploy NightBounty.",
+        "Save the local recovery seed and encrypted private-state password; they are needed for owner-only contract calls.",
+        "Copy the runner’s verified contract address and deployment transaction hash into `midnight/deployment.json`.",
+        "Add the same verified values to Streamlit Cloud secrets before claiming PreProd verified.",
         "Run the submit → accept → shielded payout demo and retain transaction screenshots for Devpost.",
     ]
     for index, item in enumerate(checklist, start=1):

@@ -29,26 +29,19 @@ To support several on-chain bounties, deploy one contract instance per bounty or
 
 ## Deploy during the hackathon
 
-1. Use the current official [`example-bboard`](https://github.com/midnightntwrk/example-bboard) template as the toolchain reference. It includes the supported Compact compiler, CLI/API patterns, PreProd configuration, Lace wallet setup, and local Docker proof server.
-2. Replace the example contract source with `contract/src/nightbounty.compact`.
-3. Configure Lace for **Midnight PreProd**, get `tNIGHT` from the faucet, and generate `tDUST` for transaction fees.
-4. Start the local proof server from the official template.
-5. Install the official Compact compiler, then open a new terminal so `~/.local/bin` is on `PATH`:
+1. Use the included [`deployer/`](deployer/README.md) package. It is a NightBounty-specific adaptation of the official [`example-bboard`](https://github.com/midnightntwrk/example-bboard) provider patterns; do not deploy the bulletin-board example contract.
+2. Compile `contract/src/nightbounty.compact` with the matching Compact language compiler so `contract/managed/nightbounty` exists.
+3. From `midnight/deployer`, run `npm ci`, `npm run proof-server:up`, and `npm run deploy`. The runner creates or recovers a local PreProd wallet, requests tNIGHT, generates tDUST, and deploys NightBounty.
+4. Save the recovery seed and encrypted `.private-state/` password offline. They are required for later owner-only contract calls.
+5. If the faucet does not respond automatically, use the public address printed by the runner at the PreProd faucet, then rerun with the same recovery seed.
+6. If you need to compile manually, install the official Compact compiler, then open a new terminal so `~/.local/bin` is on `PATH`:
 
    ```bash
    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
    compact --version
    ```
 
-6. Compile the contract:
-
-   ```bash
-   cd midnight/contract
-   npm install
-   npm run compact
-   ```
-
-7. Deploy with the official template's PreProd CLI flow and copy the verified contract address and deployment transaction into `midnight/deployment.json`:
+7. Copy the deployer’s verified `contractAddress` and `deployTxHash` into `midnight/deployment.json`:
 
    ```bash
    cp midnight/deployment.json.example midnight/deployment.json

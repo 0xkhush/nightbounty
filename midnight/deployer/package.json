@@ -1,0 +1,45 @@
+{
+  "name": "nightbounty-midnight-preprod-deployer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deployment-only runner for the NightBounty Compact contract on Midnight PreProd.",
+  "engines": {
+    "node": ">=24.11.1"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "node dist/index.js",
+    "deploy": "npm run build && npm run start",
+    "proof-server:up": "docker compose -f proof-server.compose.yml up -d",
+    "proof-server:down": "docker compose -f proof-server.compose.yml down"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "0.16.0",
+    "@midnight-ntwrk/ledger-v8": "8.1.0",
+    "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
+    "@midnight-ntwrk/midnight-js-types": "4.1.1",
+    "@midnight-ntwrk/midnight-js-utils": "4.1.1",
+    "@midnight-ntwrk/testkit-js": "4.1.1",
+    "@midnight-ntwrk/wallet-sdk": "1.2.0",
+    "@midnight-ntwrk/wallet-sdk-address-format": "3.1.2",
+    "@midnight-ntwrk/wallet-sdk-facade": "4.1.0",
+    "@midnight-ntwrk/wallet-sdk-hd": "3.0.3",
+    "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "3.1.0",
+    "pino": "10.3.1",
+    "rxjs": "7.8.2",
+    "ws": "8.21.1"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.4",
+    "@types/ws": "8.18.1",
+    "typescript": "5.9.3"
+  }
+}
