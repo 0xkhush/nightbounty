@@ -6,7 +6,12 @@ from pathlib import Path
 
 from nightbounty import store
 from nightbounty.access import matches_owner_access_code, normalize_owner_access_code
-from nightbounty.crypto import decrypt_report, encrypt_report
+from nightbounty.crypto import (
+    decrypt_report,
+    encrypt_report,
+    generate_owner_keypair,
+    is_public_key_envelope,
+)
 
 
 class NightBountyCoreTests(unittest.TestCase):
@@ -15,6 +20,7 @@ class NightBountyCoreTests(unittest.TestCase):
         self.original_database_path = store.DATABASE_PATH
         store.DATABASE_PATH = Path(self.temp_dir.name) / "nightbounty-test.db"
         store.initialize()
+        self.owner_keypair = generate_owner_keypair()
 
     def tearDown(self) -> None:
         store.DATABASE_PATH = self.original_database_path
@@ -30,17 +36,53 @@ class NightBountyCoreTests(unittest.TestCase):
         self.assertFalse(matches_owner_access_code("incorrect-owner-code", configured))
         self.assertFalse(matches_owner_access_code("correct-owner-code-2026", None))
 
-    def test_encrypted_payload_requires_correct_collaboration_key(self) -> None:
+    def test_public_key_envelope_requires_the_owner_key_and_correct_bounty(self) -> None:
         payload = {"report_title": "Stored XSS", "impact": "Session compromise"}
-        encrypted = encrypt_report(payload, "owner-demo-key")
+        encrypted = encrypt_report(
+            payload,
+            self.owner_keypair["public_key_b64"],
+            bounty_id="BNTY-MDN-01",
+        )
+        second_encrypted = encrypt_report(
+            payload,
+            self.owner_keypair["public_key_b64"],
+            bounty_id="BNTY-MDN-01",
+        )
 
         self.assertNotIn("Stored XSS", encrypted["ciphertext"])
+        self.assertTrue(is_public_key_envelope(encrypted["encryption_salt"]))
+        self.assertNotEqual(encrypted["ciphertext"], second_encrypted["ciphertext"])
+        self.assertNotEqual(encrypted["encryption_salt"], second_encrypted["encryption_salt"])
         self.assertEqual(
-            decrypt_report(encrypted["ciphertext"], encrypted["encryption_salt"], "owner-demo-key"),
+            decrypt_report(
+                encrypted["ciphertext"],
+                encrypted["encryption_salt"],
+                self.owner_keypair["private_key_b64"],
+                bounty_id="BNTY-MDN-01",
+            ),
             payload,
         )
         with self.assertRaises(ValueError):
-            decrypt_report(encrypted["ciphertext"], encrypted["encryption_salt"], "incorrect-key")
+            decrypt_report(
+                encrypted["ciphertext"],
+                encrypted["encryption_salt"],
+                generate_owner_keypair()["private_key_b64"],
+                bounty_id="BNTY-MDN-01",
+            )
+        with self.assertRaises(ValueError):
+            decrypt_report(
+                encrypted["ciphertext"],
+                encrypted["encryption_salt"],
+                self.owner_keypair["private_key_b64"],
+                bounty_id="BNTY-MDN-02",
+            )
+        with self.assertRaises(ValueError):
+            decrypt_report(
+                encrypted["ciphertext"][:-1] + "A",
+                encrypted["encryption_salt"],
+                self.owner_keypair["private_key_b64"],
+                bounty_id="BNTY-MDN-01",
+            )
 
     def create_demo_bounty(self, title: str) -> dict[str, object]:
         return store.create_bounty(
@@ -63,16 +105,25 @@ class NightBountyCoreTests(unittest.TestCase):
         self.assertEqual(len(store.list_events(str(second_bounty["id"]))), 1)
         self.assertEqual(store.metrics()["open_bounties"], 3)
 
-        encrypted = encrypt_report({"proof": "safe demo"}, "owner-demo-key")
+        first_encrypted = encrypt_report(
+            {"proof": "safe demo"},
+            self.owner_keypair["public_key_b64"],
+            bounty_id=str(first_bounty["id"]),
+        )
+        second_encrypted = encrypt_report(
+            {"proof": "safe demo"},
+            self.owner_keypair["public_key_b64"],
+            bounty_id=str(second_bounty["id"]),
+        )
         first_report = store.submit_report(
             bounty_id=str(first_bounty["id"]),
             reporter_alias="nocturne_17",
             report_title="Unsafe attachment preview",
             severity="High",
-            ciphertext=encrypted["ciphertext"],
-            encryption_salt=encrypted["encryption_salt"],
-            commitment=encrypted["commitment"],
-            payload_digest=encrypted["payload_digest"],
+            ciphertext=first_encrypted["ciphertext"],
+            encryption_salt=first_encrypted["encryption_salt"],
+            commitment=first_encrypted["commitment"],
+            payload_digest=first_encrypted["payload_digest"],
             chain_status="LOCAL_DEMO_COMMITMENT",
         )
         second_report = store.submit_report(
@@ -80,10 +131,10 @@ class NightBountyCoreTests(unittest.TestCase):
             reporter_alias="another_researcher",
             report_title="Export authorization gap",
             severity="Medium",
-            ciphertext=encrypted["ciphertext"],
-            encryption_salt=encrypted["encryption_salt"],
-            commitment=encrypted["commitment"],
-            payload_digest=encrypted["payload_digest"],
+            ciphertext=second_encrypted["ciphertext"],
+            encryption_salt=second_encrypted["encryption_salt"],
+            commitment=second_encrypted["commitment"],
+            payload_digest=second_encrypted["payload_digest"],
             chain_status="LOCAL_DEMO_COMMITMENT",
         )
         self.assertEqual(first_report["status"], "SUBMITTED")
@@ -98,10 +149,10 @@ class NightBountyCoreTests(unittest.TestCase):
                 reporter_alias="second_researcher",
                 report_title="Duplicate report",
                 severity="High",
-                ciphertext=encrypted["ciphertext"],
-                encryption_salt=encrypted["encryption_salt"],
-                commitment=encrypted["commitment"],
-                payload_digest=encrypted["payload_digest"],
+                ciphertext=first_encrypted["ciphertext"],
+                encryption_salt=first_encrypted["encryption_salt"],
+                commitment=first_encrypted["commitment"],
+                payload_digest=first_encrypted["payload_digest"],
                 chain_status="LOCAL_DEMO_COMMITMENT",
             )
 

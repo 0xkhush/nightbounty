@@ -63,16 +63,34 @@ Or copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and repla
 owner_access_code = "your-long-random-owner-code"
 ```
 
-The access code is read server-side and is never committed. This is a focused hackathon gate—not a production identity system. In the production design, authorization is wallet-bound and enforced by the Midnight contract owner witness; report content is encrypted to the owner’s public key.
+The access code is read server-side and is never committed. This is a focused hackathon gate—not a production identity system. In the production design, authorization is wallet-bound and enforced by the Midnight contract owner witness.
+
+### Owner report-encryption key
+
+Generate one X25519 owner key pair from the repository root:
+
+```bash
+python3 tools/generate_owner_keypair.py
+```
+
+Add **only** the printed private value to local `.streamlit/secrets.toml` or Streamlit Community Cloud **App settings → Secrets**:
+
+```toml
+owner_x25519_private_key_b64 = "generated-private-key-goes-here"
+```
+
+The app derives and displays the matching public key and key ID on every bounty. Researchers never receive a shared password: each submission creates a fresh X25519 + HKDF + AES-256-GCM envelope for that public key. The private owner key is never displayed, committed, or stored in Streamlit session state.
+
+> The current Streamlit form is processed by the app server before the encrypted envelope is persisted. This provides public-key encryption at rest and removes shared report passwords. A separate browser/local researcher encoder is the next step for a zero-trust, client-only encryption boundary.
 
 ### Demo flow
 
-1. Open **Owner Console** as `AstraCMS Security Desk` and enter the server-configured owner access code.
-2. Create two scoped local demo bounties, such as a safe attachment-preview case and an export-authorization case.
-3. Open **Researcher Vault** as `nocturne_17`, select one open bounty, and submit a safe test report.
-4. Use a demo collaboration key of at least eight characters. It encrypts the report before persistence.
+1. Generate the owner X25519 key pair and add its **private** value to Streamlit secrets.
+2. Open **Owner Console** as `AstraCMS Security Desk` and enter the server-configured owner access code.
+3. Create two scoped local demo bounties, such as a safe attachment-preview case and an export-authorization case.
+4. Open **Researcher Vault** as `nocturne_17`, select one open bounty, and submit a safe test report. The app shows the public recipient key ID; there is no shared collaboration-key field.
 5. Copy the salted report commitment shown in the receipt.
-6. Return to **Owner Console**, select the same bounty context, and enter the collaboration key to decrypt the report locally for this browser session.
+6. Return to **Owner Console**, select the same bounty context, and decrypt with the configured owner private key.
 7. Accept the report. After a shielded tNIGHT transfer in Lace, paste the verified transaction/receipt commitment and mark the payout as complete.
 8. Lock the owner console, then use **Command Room** to show that each bounty has its own safe public timeline.
 
@@ -111,7 +129,8 @@ For the hackathon MVP, the Compact contract source authorizes one deployed bount
 
 ```text
 app.py                         # Polished Streamlit UI
-nightbounty/crypto.py          # Encryption and salted commitments
+nightbounty/crypto.py          # X25519 hybrid encryption and salted commitments
+ tools/generate_owner_keypair.py # Owner key-pair generator
 nightbounty/store.py           # SQLite lifecycle and public-safe events
 nightbounty/midnight.py        # Honest PreProd deployment boundary
 midnight/contract/             # Compact contract source

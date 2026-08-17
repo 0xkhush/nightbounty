@@ -8,7 +8,15 @@ from textwrap import dedent
 import streamlit as st
 
 from nightbounty.access import matches_owner_access_code, normalize_owner_access_code
-from nightbounty.crypto import decrypt_report, encrypt_report, short_commitment
+from nightbounty.crypto import (
+    decrypt_legacy_report,
+    decrypt_report,
+    encrypt_report,
+    is_public_key_envelope,
+    owner_key_id,
+    owner_public_key_from_private_key,
+    short_commitment,
+)
 from nightbounty.midnight import contract_label, get_deployment, lifecycle_chain_note
 from nightbounty.store import (
     create_bounty,
@@ -249,7 +257,12 @@ def bounty_label(bounty: dict[str, object]) -> str:
     return f"{bounty['id']} · {bounty['status']} · {bounty['title']}"
 
 
-def render_bounty_card(bounty: dict[str, object]) -> None:
+def render_bounty_card(bounty: dict[str, object], owner_encryption_key_id: str | None = None) -> None:
+    encryption_chip = (
+        f'<span class="chip violet">OWNER KEY · {esc(owner_encryption_key_id)}</span>'
+        if owner_encryption_key_id
+        else '<span class="chip amber">ENCRYPTION SETUP REQUIRED</span>'
+    )
     st.markdown(
         f"""
         <div class="bounty-card">
@@ -260,7 +273,7 @@ def render_bounty_card(bounty: dict[str, object]) -> None:
                 {status_chip(str(bounty['status']))}
                 <span class="chip coral">{esc(bounty['severity'])}</span>
                 <span class="chip mint">{esc(bounty['reward'])}</span>
-                <span class="chip">PRIVATE REPORTING</span>
+                {encryption_chip}
             </div>
             <div class="mono">SCOPE · {esc(bounty['scope'])}</div>
         </div>
@@ -271,6 +284,7 @@ def render_bounty_card(bounty: dict[str, object]) -> None:
 
 def render_command_room() -> None:
     bounties = list_bounties()
+    owner_encryption = get_owner_encryption_profile()
     deployment = get_deployment()
     summary = metrics()
 
@@ -308,7 +322,13 @@ def render_command_room() -> None:
     if not bounties:
         st.info("No bounties have been published yet. The authorized owner can create one in Owner Console.")
     for bounty in bounties:
-        render_bounty_card(bounty)
+        render_bounty_card(bounty, owner_encryption["key_id"] if owner_encryption else None)
+
+    if owner_encryption:
+        with st.expander("AstraCMS public report-encryption key", expanded=False):
+            st.caption("This key is public and can encrypt reports only. The matching private key remains in the owner’s server-side configuration.")
+            st.code(owner_encryption["public_key_b64"], language=None)
+            st.caption(f"Key ID · {owner_encryption['key_id']}")
 
     left, right = st.columns([0.95, 1.05], gap="large")
     with left:
@@ -350,7 +370,14 @@ def render_submit_report() -> None:
 
     st.markdown("<div class='eyebrow'>RESEARCHER VAULT</div>", unsafe_allow_html=True)
     st.header("Submit a private report")
-    st.caption("Choose one open bounty. The report is encrypted before it is written to the local vault; only ciphertext, a salted commitment, and a safe public event are persisted.")
+    st.caption("Choose one open bounty. Every report uses a fresh encryption envelope for the owner’s published X25519 public key before it is persisted.")
+    owner_encryption = get_owner_encryption_profile()
+
+    if not owner_encryption:
+        st.error("Secure submissions are unavailable until the owner configures a valid X25519 report-encryption private key.")
+        st.code('owner_x25519_private_key_b64 = "<generated-private-key>"', language="toml")
+        st.caption("The owner generates this once and stores it only in Streamlit secrets. Researchers never receive or enter it.")
+        return
 
     if not open_bounties:
         st.warning("There are no open bounties right now. The owner can publish another scoped demo bounty in Owner Console.")
@@ -373,7 +400,8 @@ def render_submit_report() -> None:
                 <p class="mono">SCOPE · {esc(bounty['scope'])}</p>
                 <hr>
                 <p>Use only the stated demo scope. Do not test production systems, extract data, or use denial-of-service techniques.</p>
-                <p class="mono">PAYLOAD → AES-GCM / FERNET CIPHERTEXT</p>
+                <p class="mono">RECIPIENT KEY · {esc(owner_encryption['key_id'])}</p>
+                <p class="mono">PAYLOAD → X25519 + HKDF + AES-256-GCM</p>
                 <p class="mono">COMMITMENT → SHA-256(PAYLOAD + RANDOM SALT)</p>
             </div>
             """,
@@ -388,17 +416,13 @@ def render_submit_report() -> None:
             impact = st.text_area("Impact", placeholder="Explain what an attacker could do if this issue were exploited.", height=110)
             reproduction = st.text_area("Safe reproduction steps", placeholder="Use the isolated target and test account. Keep the proof of concept minimal.", height=150)
             remediation = st.text_area("Suggested remediation", placeholder="Example: apply context-aware output encoding and a restrictive CSP.", height=100)
-            collaboration_key = st.text_input(
-                "Owner collaboration key",
-                type="password",
-                help="For the hackathon demo, share this only with the owner so they can decrypt the report. Production uses the project's public encryption key instead.",
-            )
+            st.info(f"This report will be encrypted automatically for owner key `{owner_encryption['key_id']}`. Researchers never enter a shared decryption password.")
             accepted_rules = st.checkbox("I tested only the stated demo scope and did not access real user data.")
             submitted = st.form_submit_button("Encrypt & commit private report", use_container_width=True)
 
         if submitted:
-            if not all([reporter_alias.strip(), report_title.strip(), impact.strip(), reproduction.strip(), collaboration_key.strip()]):
-                st.error("Add your alias, title, impact, reproduction steps, and collaboration key.")
+            if not all([reporter_alias.strip(), report_title.strip(), impact.strip(), reproduction.strip()]):
+                st.error("Add your alias, title, impact, and reproduction steps.")
             elif not accepted_rules:
                 st.error("Confirm the safe-testing rule before submitting.")
             else:
@@ -413,7 +437,11 @@ def render_submit_report() -> None:
                     "remediation": remediation.strip(),
                 }
                 try:
-                    encrypted = encrypt_report(payload, collaboration_key)
+                    encrypted = encrypt_report(
+                        payload,
+                        owner_encryption["public_key_b64"],
+                        bounty_id=str(bounty["id"]),
+                    )
                     report = submit_report(
                         bounty_id=str(bounty["id"]),
                         reporter_alias=reporter_alias,
@@ -432,6 +460,7 @@ def render_submit_report() -> None:
                             <div class="eyebrow">YOUR SAFE RECEIPT</div>
                             <h3>{esc(report['id'])}</h3>
                             <p class="mono">BOUNTY · {esc(bounty['id'])}</p>
+                            <p class="mono">RECIPIENT KEY · {esc(owner_encryption['key_id'])}</p>
                             <p class="mono">COMMITMENT · {esc(short_commitment(report['commitment']))}</p>
                             <p class="mono">PAYLOAD DIGEST · {esc(short_commitment(report['payload_digest']))}</p>
                             <p>{esc(lifecycle_chain_note('submitReport'))}</p>
@@ -443,15 +472,42 @@ def render_submit_report() -> None:
                     st.error(str(exc))
 
 
-def get_owner_access_code() -> str | None:
-    """Read the owner gate from a server-side environment variable or secret."""
-    configured = os.getenv("NIGHTBOUNTY_OWNER_ACCESS_CODE")
+def read_server_secret(environment_name: str, streamlit_name: str) -> str | None:
+    """Read a secret without exposing it to the UI or browser session state."""
+    configured = os.getenv(environment_name)
     if not configured:
         try:
-            configured = st.secrets.get("owner_access_code")
+            configured = st.secrets.get(streamlit_name)
         except FileNotFoundError:
             configured = None
-    return normalize_owner_access_code(configured)
+    value = str(configured or "").strip()
+    return value or None
+
+
+def get_owner_access_code() -> str | None:
+    """Read the owner gate from a server-side environment variable or secret."""
+    return normalize_owner_access_code(
+        read_server_secret("NIGHTBOUNTY_OWNER_ACCESS_CODE", "owner_access_code")
+    )
+
+
+def get_owner_encryption_profile() -> dict[str, str] | None:
+    """Derive the public owner profile from a server-only X25519 private key."""
+    private_key_b64 = read_server_secret(
+        "NIGHTBOUNTY_OWNER_X25519_PRIVATE_KEY_B64",
+        "owner_x25519_private_key_b64",
+    )
+    if not private_key_b64:
+        return None
+    try:
+        public_key_b64 = owner_public_key_from_private_key(private_key_b64)
+    except ValueError:
+        return None
+    return {
+        "private_key_b64": private_key_b64,
+        "public_key_b64": public_key_b64,
+        "key_id": owner_key_id(public_key_b64),
+    }
 
 
 def lock_owner_console() -> None:
@@ -485,13 +541,20 @@ def render_owner_console() -> None:
             st.error("That owner access code is not valid.")
         return
 
+    owner_encryption = get_owner_encryption_profile()
     action_column, lock_column = st.columns([0.76, 0.24])
     with action_column:
-        st.caption("AstraCMS Security Desk is the one authorized demo owner. Publish scoped bounties here, then decrypt and review reports only in their bounty context.")
+        if owner_encryption:
+            st.caption(f"AstraCMS Security Desk is the authorized demo owner. New reports are encrypted for `{owner_encryption['key_id']}` and can be decrypted only with this configured private key.")
+        else:
+            st.caption("AstraCMS Security Desk is the authorized demo owner. Configure the owner X25519 private key before accepting secure reports.")
     with lock_column:
         if st.button("Lock console", use_container_width=True):
             lock_owner_console()
             st.rerun()
+
+    if not owner_encryption:
+        st.warning("Report encryption is not configured. Create a key with `python3 tools/generate_owner_keypair.py`, then add the private value to Streamlit secrets. Do not publish that private value.")
 
     st.markdown("<br><div class='eyebrow'>PUBLISH DEMO BOUNTY</div>", unsafe_allow_html=True)
     with st.expander("Create a new scoped bounty", expanded=False):
@@ -554,7 +617,7 @@ def render_owner_console() -> None:
         return
     bounty = bounty_options[selected_label]
     st.session_state["owner_selected_bounty"] = bounty["id"]
-    render_bounty_card(bounty)
+    render_bounty_card(bounty, owner_encryption["key_id"] if owner_encryption else None)
 
     reports = list_reports(str(bounty["id"]))
     if not reports:
@@ -592,18 +655,33 @@ def render_owner_console() -> None:
         unsafe_allow_html=True,
     )
 
-    with st.form(f"unlock_{report['id']}"):
-        collaboration_key = st.text_input("Owner collaboration key", type="password")
-        unlocked = st.form_submit_button("Decrypt report locally")
-
-    if unlocked:
-        try:
-            st.session_state[f"payload_{report['id']}"] = decrypt_report(
-                report["ciphertext"], report["encryption_salt"], collaboration_key
-            )
-            st.success("Report decrypted for this browser session.")
-        except ValueError as exc:
-            st.error(str(exc))
+    if is_public_key_envelope(report["encryption_salt"]):
+        if not owner_encryption:
+            st.error("This report is encrypted for an owner key that is not configured on this server.")
+        elif st.button("Decrypt with configured owner key", type="primary", key=f"decrypt_{report['id']}"):
+            try:
+                st.session_state[f"payload_{report['id']}"] = decrypt_report(
+                    report["ciphertext"],
+                    report["encryption_salt"],
+                    owner_encryption["private_key_b64"],
+                    bounty_id=report["bounty_id"],
+                )
+                st.success("Report authenticated and decrypted for this owner session.")
+            except ValueError as exc:
+                st.error(str(exc))
+    else:
+        st.warning("This is a legacy shared-key demo report created before the public-key upgrade.")
+        with st.form(f"legacy_unlock_{report['id']}"):
+            collaboration_key = st.text_input("Legacy collaboration key", type="password")
+            unlocked = st.form_submit_button("Decrypt legacy report")
+        if unlocked:
+            try:
+                st.session_state[f"payload_{report['id']}"] = decrypt_legacy_report(
+                    report["ciphertext"], report["encryption_salt"], collaboration_key
+                )
+                st.success("Legacy report decrypted for this owner session.")
+            except ValueError as exc:
+                st.error(str(exc))
 
     payload = st.session_state.get(f"payload_{report['id']}")
     if payload:
