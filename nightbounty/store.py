@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .auth import hash_password, normalize_alias, verify_password
+
 ROOT = Path(__file__).resolve().parents[1]
 DATABASE_PATH = Path(os.getenv("NIGHTBOUNTY_DB", ROOT / "nightbounty.db"))
 
@@ -48,9 +50,17 @@ def initialize() -> None:
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS researchers (
+                id TEXT PRIMARY KEY,
+                alias TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS reports (
                 id TEXT PRIMARY KEY,
                 bounty_id TEXT NOT NULL,
+                researcher_id TEXT,
                 reporter_alias TEXT NOT NULL,
                 report_title TEXT NOT NULL,
                 severity TEXT NOT NULL,
@@ -62,7 +72,8 @@ def initialize() -> None:
                 payout_reference TEXT,
                 created_at TEXT NOT NULL,
                 reviewed_at TEXT,
-                FOREIGN KEY (bounty_id) REFERENCES bounties(id)
+                FOREIGN KEY (bounty_id) REFERENCES bounties(id),
+                FOREIGN KEY (researcher_id) REFERENCES researchers(id)
             );
 
             CREATE TABLE IF NOT EXISTS events (
@@ -78,6 +89,12 @@ def initialize() -> None:
                 FOREIGN KEY (report_id) REFERENCES reports(id)
             );
             """
+        )
+        report_columns = {row["name"] for row in conn.execute("PRAGMA table_info(reports)").fetchall()}
+        if "researcher_id" not in report_columns:
+            conn.execute("ALTER TABLE reports ADD COLUMN researcher_id TEXT")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reports_researcher_created ON reports (researcher_id, created_at DESC)"
         )
     seed_demo_data()
 
@@ -174,6 +191,49 @@ def list_bounties() -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def register_researcher(alias: str, password: str) -> dict[str, Any]:
+    """Create a pseudonymous researcher account without collecting email or identity data."""
+    normalized_alias = normalize_alias(alias)
+    password_hash = hash_password(password)
+    researcher_id = f"RSR-{uuid.uuid4().hex[:10].upper()}"
+    with connection() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO researchers (id, alias, password_hash, created_at) VALUES (?, ?, ?, ?)",
+                (researcher_id, normalized_alias, password_hash, now()),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("That researcher alias is already registered.") from exc
+        row = conn.execute(
+            "SELECT id, alias, created_at FROM researchers WHERE id = ?", (researcher_id,)
+        ).fetchone()
+    assert row is not None
+    return dict(row)
+
+
+def authenticate_researcher(alias: str, password: str) -> dict[str, Any] | None:
+    """Return a safe public account record for a valid pseudonymous login."""
+    try:
+        normalized_alias = normalize_alias(alias)
+    except ValueError:
+        return None
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, alias, password_hash, created_at FROM researchers WHERE alias = ?", (normalized_alias,)
+        ).fetchone()
+    if row is None or not verify_password(password, row["password_hash"]):
+        return None
+    return {"id": row["id"], "alias": row["alias"], "created_at": row["created_at"]}
+
+
+def get_researcher(researcher_id: str) -> dict[str, Any] | None:
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT id, alias, created_at FROM researchers WHERE id = ?", (researcher_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def create_bounty(
     *,
     title: str,
@@ -238,7 +298,7 @@ def create_bounty(
 def submit_report(
     *,
     bounty_id: str,
-    reporter_alias: str,
+    researcher_id: str,
     report_title: str,
     severity: str,
     ciphertext: str,
@@ -249,6 +309,11 @@ def submit_report(
 ) -> dict[str, Any]:
     report_id = f"RPT-{uuid.uuid4().hex[:8].upper()}"
     with connection() as conn:
+        researcher = conn.execute(
+            "SELECT alias FROM researchers WHERE id = ?", (researcher_id,)
+        ).fetchone()
+        if researcher is None:
+            raise ValueError("Sign in with a valid researcher account before submitting a report.")
         bounty = conn.execute("SELECT status FROM bounties WHERE id = ?", (bounty_id,)).fetchone()
         if bounty is None:
             raise ValueError("Bounty not found.")
@@ -258,14 +323,15 @@ def submit_report(
         conn.execute(
             """
             INSERT INTO reports (
-                id, bounty_id, reporter_alias, report_title, severity, ciphertext,
+                id, bounty_id, researcher_id, reporter_alias, report_title, severity, ciphertext,
                 encryption_salt, commitment, payload_digest, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 report_id,
                 bounty_id,
-                reporter_alias.strip(),
+                researcher_id,
+                researcher["alias"],
                 report_title.strip(),
                 severity,
                 ciphertext,

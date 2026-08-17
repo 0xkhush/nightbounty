@@ -19,7 +19,7 @@ A vulnerability report is exactly the kind of data that should **not** be placed
 
 ## Solo-hackathon MVP
 
-The Streamlit workspace lets one authorized organization publish several **local demo bounties**. Each bounty independently follows one focused, private first-report lifecycle:
+The Streamlit workspace lets one authorized organization publish several **local demo bounties**. Researchers create pseudonymous accounts with a handle and password—no email or real-name collection in this MVP. Each bounty independently follows one focused, private first-report lifecycle:
 
 ```text
 OPEN → REPORT_SUBMITTED → ACCEPTED / REJECTED → PAID
@@ -83,12 +83,23 @@ The app derives and displays the matching public key and key ID on every bounty.
 
 > The current Streamlit form is processed by the app server before the encrypted envelope is persisted. This provides public-key encryption at rest and removes shared report passwords. A separate browser/local researcher encoder is the next step for a zero-trust, client-only encryption boundary.
 
+### Researcher accounts
+
+Researcher Vault requires a pseudonymous account before a report can be submitted:
+
+- Alias: 3–32 lowercase letters, numbers, and underscores; must begin with a letter.
+- Password: at least 12 characters, stored as a salted `scrypt` hash.
+- No email, real name, or password recovery is collected in this hackathon MVP.
+- The immutable authenticated account ID—not a free-form form field—is attached to each new report.
+
+One account can submit to several open bounties. The current responsible-disclosure lifecycle remains **first report per bounty**; later submissions to that same bounty are closed until the owner resolves it.
+
 ### Demo flow
 
 1. Generate the owner X25519 key pair and add its **private** value to Streamlit secrets.
 2. Open **Owner Console** as `AstraCMS Security Desk` and enter the server-configured owner access code.
 3. Create two scoped local demo bounties, such as a safe attachment-preview case and an export-authorization case.
-4. Open **Researcher Vault** as `nocturne_17`, select one open bounty, and submit a safe test report. The app shows the public recipient key ID; there is no shared collaboration-key field.
+4. Open **Researcher Vault**, create a pseudonymous `nocturne_17` account, select one open bounty, and submit a safe test report. The app shows the public recipient key ID; there is no shared collaboration-key field.
 5. Copy the salted report commitment shown in the receipt.
 6. Return to **Owner Console**, select the same bounty context, and decrypt with the configured owner private key.
 7. Accept the report. After a shielded tNIGHT transfer in Lace, paste the verified transaction/receipt commitment and mark the payout as complete.
@@ -131,7 +142,8 @@ For the hackathon MVP, the Compact contract source authorizes one deployed bount
 app.py                         # Polished Streamlit UI
 nightbounty/crypto.py          # X25519 hybrid encryption and salted commitments
  tools/generate_owner_keypair.py # Owner key-pair generator
-nightbounty/store.py           # SQLite lifecycle and public-safe events
+nightbounty/store.py           # SQLite accounts, lifecycle, and public-safe events
+nightbounty/auth.py            # Pseudonymous researcher password hashing
 nightbounty/midnight.py        # Honest PreProd deployment boundary
 midnight/contract/             # Compact contract source
 midnight/deployment.json.example

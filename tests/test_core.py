@@ -84,6 +84,9 @@ class NightBountyCoreTests(unittest.TestCase):
                 bounty_id="BNTY-MDN-01",
             )
 
+    def create_researcher(self, alias: str) -> dict[str, object]:
+        return store.register_researcher(alias, f"secure-password-{alias}-2026")
+
     def create_demo_bounty(self, title: str) -> dict[str, object]:
         return store.create_bounty(
             title=title,
@@ -95,9 +98,22 @@ class NightBountyCoreTests(unittest.TestCase):
             owner_alias="AstraCMS Security Desk",
         )
 
+    def test_researcher_accounts_are_pseudonymous_and_password_protected(self) -> None:
+        created = self.create_researcher("Nocturne_17")
+
+        self.assertEqual(created["alias"], "nocturne_17")
+        authenticated = store.authenticate_researcher("NOCTURNE_17", "secure-password-Nocturne_17-2026")
+        assert authenticated is not None
+        self.assertEqual(authenticated["id"], created["id"])
+        self.assertIsNone(store.authenticate_researcher("nocturne_17", "incorrect-password"))
+        with self.assertRaises(ValueError):
+            self.create_researcher("nocturne_17")
+
     def test_multiple_bounties_are_isolated(self) -> None:
         first_bounty = self.create_demo_bounty("Unsafe attachment preview")
         second_bounty = self.create_demo_bounty("Misconfigured export endpoint")
+        first_researcher = self.create_researcher("nocturne_17")
+        second_researcher = self.create_researcher("another_researcher")
         self.assertNotEqual(first_bounty["id"], second_bounty["id"])
         self.assertEqual(first_bounty["status"], "OPEN")
         self.assertEqual(second_bounty["status"], "OPEN")
@@ -117,7 +133,7 @@ class NightBountyCoreTests(unittest.TestCase):
         )
         first_report = store.submit_report(
             bounty_id=str(first_bounty["id"]),
-            reporter_alias="nocturne_17",
+            researcher_id=str(first_researcher["id"]),
             report_title="Unsafe attachment preview",
             severity="High",
             ciphertext=first_encrypted["ciphertext"],
@@ -128,7 +144,7 @@ class NightBountyCoreTests(unittest.TestCase):
         )
         second_report = store.submit_report(
             bounty_id=str(second_bounty["id"]),
-            reporter_alias="another_researcher",
+            researcher_id=str(second_researcher["id"]),
             report_title="Export authorization gap",
             severity="Medium",
             ciphertext=second_encrypted["ciphertext"],
@@ -139,6 +155,10 @@ class NightBountyCoreTests(unittest.TestCase):
         )
         self.assertEqual(first_report["status"], "SUBMITTED")
         self.assertEqual(second_report["status"], "SUBMITTED")
+        self.assertEqual(first_report["researcher_id"], first_researcher["id"])
+        self.assertEqual(first_report["reporter_alias"], "nocturne_17")
+        self.assertEqual(second_report["researcher_id"], second_researcher["id"])
+        self.assertEqual(second_report["reporter_alias"], "another_researcher")
         self.assertEqual([report["id"] for report in store.list_reports(str(first_bounty["id"]))], [first_report["id"]])
         self.assertEqual([report["id"] for report in store.list_reports(str(second_bounty["id"]))], [second_report["id"]])
         self.assertTrue(all(event["bounty_id"] == first_bounty["id"] for event in store.list_events(str(first_bounty["id"]))))
@@ -146,7 +166,7 @@ class NightBountyCoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.submit_report(
                 bounty_id=str(first_bounty["id"]),
-                reporter_alias="second_researcher",
+                researcher_id=str(second_researcher["id"]),
                 report_title="Duplicate report",
                 severity="High",
                 ciphertext=first_encrypted["ciphertext"],

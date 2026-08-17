@@ -19,13 +19,16 @@ from nightbounty.crypto import (
 )
 from nightbounty.midnight import contract_label, get_deployment, lifecycle_chain_note
 from nightbounty.store import (
+    authenticate_researcher,
     create_bounty,
     get_report,
+    get_researcher,
     initialize,
     list_bounties,
     list_events,
     list_reports,
     metrics,
+    register_researcher,
     reset_demo_data,
     submit_report,
     transition_report,
@@ -365,12 +368,72 @@ def render_command_room() -> None:
         )
 
 
+def current_researcher() -> dict[str, object] | None:
+    researcher_id = st.session_state.get("researcher_id")
+    if not isinstance(researcher_id, str):
+        return None
+    researcher = get_researcher(researcher_id)
+    if researcher is None:
+        st.session_state.pop("researcher_id", None)
+    return researcher
+
+
+def render_researcher_access() -> dict[str, object] | None:
+    """Render pseudonymous research-account sign-up/sign-in before report access."""
+    researcher = current_researcher()
+    if researcher is not None:
+        identity_column, logout_column = st.columns([0.75, 0.25])
+        with identity_column:
+            st.caption(f"Signed in as researcher `{researcher['alias']}`. Your pseudonym is attached to new private reports.")
+        with logout_column:
+            if st.button("Log out", use_container_width=True, key="researcher_logout"):
+                st.session_state.pop("researcher_id", None)
+                st.rerun()
+        return researcher
+
+    st.markdown("<div class='eyebrow'>RESEARCHER IDENTITY</div>", unsafe_allow_html=True)
+    st.caption("Create a pseudonymous account to submit a report. NightBounty collects no email or real-name data in this MVP.")
+    signup_tab, login_tab = st.tabs(["Sign up", "Log in"])
+    with signup_tab:
+        with st.form("researcher_signup"):
+            signup_alias = st.text_input("Researcher alias", placeholder="e.g. nocturne_17")
+            signup_password = st.text_input("Password", type="password", help="At least 12 characters. Store it safely; this MVP has no password recovery.")
+            confirm_password = st.text_input("Confirm password", type="password")
+            registered = st.form_submit_button("Create researcher account", type="primary", use_container_width=True)
+        if registered:
+            if signup_password != confirm_password:
+                st.error("Passwords do not match.")
+            else:
+                try:
+                    created = register_researcher(signup_alias, signup_password)
+                    st.session_state["researcher_id"] = created["id"]
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
+    with login_tab:
+        with st.form("researcher_login"):
+            login_alias = st.text_input("Researcher alias", key="researcher_login_alias")
+            login_password = st.text_input("Password", type="password", key="researcher_login_password")
+            logged_in = st.form_submit_button("Log in to Researcher Vault", use_container_width=True)
+        if logged_in:
+            authenticated = authenticate_researcher(login_alias, login_password)
+            if authenticated is None:
+                st.error("Invalid alias or password.")
+            else:
+                st.session_state["researcher_id"] = authenticated["id"]
+                st.rerun()
+    return None
+
+
 def render_submit_report() -> None:
     open_bounties = [bounty for bounty in list_bounties() if bounty["status"] == "OPEN"]
 
     st.markdown("<div class='eyebrow'>RESEARCHER VAULT</div>", unsafe_allow_html=True)
     st.header("Submit a private report")
     st.caption("Choose one open bounty. Every report uses a fresh encryption envelope for the owner’s published X25519 public key before it is persisted.")
+    researcher = render_researcher_access()
+    if researcher is None:
+        return
     owner_encryption = get_owner_encryption_profile()
 
     if not owner_encryption:
@@ -410,7 +473,7 @@ def render_submit_report() -> None:
 
     with left:
         with st.form("private_report_form", clear_on_submit=True):
-            reporter_alias = st.text_input("Researcher alias", placeholder="e.g. nocturne_17")
+            st.caption(f"Submitting as `{researcher['alias']}`")
             report_title = st.text_input("Report title", placeholder="Stored XSS through the editor preview field")
             severity = st.selectbox("Suggested severity", ["Critical", "High", "Medium", "Low"]) or "Low"
             impact = st.text_area("Impact", placeholder="Explain what an attacker could do if this issue were exploited.", height=110)
@@ -421,15 +484,15 @@ def render_submit_report() -> None:
             submitted = st.form_submit_button("Encrypt & commit private report", use_container_width=True)
 
         if submitted:
-            if not all([reporter_alias.strip(), report_title.strip(), impact.strip(), reproduction.strip()]):
-                st.error("Add your alias, title, impact, and reproduction steps.")
+            if not all([report_title.strip(), impact.strip(), reproduction.strip()]):
+                st.error("Add a title, impact, and reproduction steps.")
             elif not accepted_rules:
                 st.error("Confirm the safe-testing rule before submitting.")
             else:
                 payload = {
                     "schema": "nightbounty.report.v1",
                     "bounty_id": bounty["id"],
-                    "reporter_alias": reporter_alias.strip(),
+                    "researcher_alias": researcher["alias"],
                     "report_title": report_title.strip(),
                     "severity": severity,
                     "impact": impact.strip(),
@@ -444,7 +507,7 @@ def render_submit_report() -> None:
                     )
                     report = submit_report(
                         bounty_id=str(bounty["id"]),
-                        reporter_alias=reporter_alias,
+                        researcher_id=str(researcher["id"]),
                         report_title=report_title,
                         severity=severity,
                         ciphertext=encrypted["ciphertext"],
@@ -829,11 +892,12 @@ def render_sidebar() -> str:
         else:
             st.markdown("<span class='chip amber'>DEPLOYMENT PENDING</span>", unsafe_allow_html=True)
         st.caption(contract_label())
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Reset local demo data", use_container_width=True):
-            reset_demo_data()
-            lock_owner_console()
-            st.rerun()
+        if st.session_state.get("is_owner"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Reset local demo data", use_container_width=True):
+                reset_demo_data()
+                lock_owner_console()
+                st.rerun()
         st.markdown("<p class='mono' style='margin-top:1.5rem'>BUILD FOR JUDGES</p>", unsafe_allow_html=True)
         st.caption("Show the Compact contract, PreProd address, private report flow, and shielded payout receipt—not a fake dashboard.")
     return page or "Command Room"
