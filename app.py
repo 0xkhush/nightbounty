@@ -257,7 +257,8 @@ h3 { letter-spacing: -0.02em; }
     color: var(--paper) !important;
     font-size: .9rem !important;
 }
-[data-testid="stAlert"] { border-radius: var(--radius-md); }
+[data-testid="stAlert"] { border-radius: var(--radius-md); font-family: 'Space Grotesk', sans-serif !important; }
+[data-testid="stAlert"] * { font-family: inherit !important; }
 [data-testid="stExpander"] { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel); }
 hr { border-color: var(--line); }
 
