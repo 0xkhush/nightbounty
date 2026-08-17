@@ -27,7 +27,14 @@ OPEN → REPORT_SUBMITTED → ACCEPTED / REJECTED → PAID
 2. Replace the example contract source with `contract/src/nightbounty.compact`.
 3. Configure Lace for **Midnight PreProd**, get `tNIGHT` from the faucet, and generate `tDUST` for transaction fees.
 4. Start the local proof server from the official template.
-5. Compile the contract once the `compact` compiler is installed:
+5. Install the official Compact compiler, then open a new terminal so `~/.local/bin` is on `PATH`:
+
+   ```bash
+   curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
+   compact --version
+   ```
+
+6. Compile the contract:
 
    ```bash
    cd midnight/contract
@@ -35,7 +42,7 @@ OPEN → REPORT_SUBMITTED → ACCEPTED / REJECTED → PAID
    npm run compact
    ```
 
-6. Deploy with the official template's PreProd CLI flow and copy the verified contract address and deployment transaction into `midnight/deployment.json`:
+7. Deploy with the official template's PreProd CLI flow and copy the verified contract address and deployment transaction into `midnight/deployment.json`:
 
    ```bash
    cp midnight/deployment.json.example midnight/deployment.json
